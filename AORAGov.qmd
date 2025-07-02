@@ -656,7 +656,7 @@ gg_miss_fct(PROMVR12, CreationYear) +
 The VR12 is a *general* health questionnaire that is presented to *all* patients enrolled in the registry.
 
 ```{r}
-#| label: fig-vr12-cohort
+#| label: fig-vr12pcs-cohort
 #| fig-cap: "Summary of VR12 at baseline by cohort"
 
 Snapshot <- dplyr::mutate(
@@ -664,17 +664,32 @@ Snapshot <- dplyr::mutate(
   across(contains("Score"), ~as.numeric(.))
 )
 
-FigureVR12 <- Snapshot |> ggplot(aes(y = RegistryCohortName, x = VR12_Physical_TotalScore_Preop)) +
+FigureVR12PCS <- Snapshot |> ggplot(aes(y = RegistryCohortName, x = VR12_Physical_TotalScore_Preop)) +
   stat_halfeye()
 
 
-knitr::knit_print(FigureVR12)
+knitr::knit_print(FigureVR12PCS)
 
 ```
 
 Between-cohort variability is observed for the Physical Component Score of the VR12, but not as pronounced for the Mental Component Score. Most notable is the high variation within all cohorts for both VR12 component scores.
 
+```{r}
+#| label: fig-vr12mcs-cohort
+#| fig-cap: "Summary of VR12 Mental Component at baseline by cohort"
 
+Snapshot <- dplyr::mutate(
+  Snapshot,
+  across(contains("Score"), ~as.numeric(.))
+)
+
+FigureVR12MCS <- Snapshot |> ggplot(aes(y = RegistryCohortName, x = VR12_Mental_TotalScore_Preop)) +
+  stat_halfeye()
+
+
+knitr::knit_print(FigureVR12MCS)
+
+```
 
 ```{r}
 
@@ -871,20 +886,87 @@ knitr::knit_print(TableKAdemo)
 ```
 
 ```{r}
-#| label: tbl-ka-intraop
-#| tbl-cap: "Summary of intraoperative variables in Knee Arthritis cohort"
 
-TableKAsurg <- gtsummary::tbl_summary(
-  Snapshot |> dplyr::filter(
+# Extract volume
+extract_primary_dose <- function(text) {
+  as.numeric(str_extract(text, "\\d+\\.?\\d*(?=\\s*ml)"))
+}
+
+# Extract primary anaesthetic agent
+extract_primary_agent <- function(text) {
+  text_clean <- str_to_lower(str_trim(text))
+  case_when(
+    str_detect(text_clean, "marcain|bupivacaine") ~ "marcain",
+    str_detect(text_clean, "lidocaine|lignocaine") ~ "lidocaine",
+    TRUE ~ str_to_lower(str_extract(text_clean, "(?<=ml\\s)\\w+"))
+  )
+}
+
+# Extract secondary drug dose
+extract_secondary_dose <- function(text) {
+  as.numeric(str_extract(text, "\\d+(?=\\s*mcg)"))
+}
+
+# Extract secondary drug name
+extract_secondary_agent <- function(text) {
+  text_clean <- str_to_lower(str_trim(text))
+  case_when(
+    str_detect(text_clean, "morphine") ~ "morphine",
+    str_detect(text_clean, "fentanyl|fent") ~ "fentanyl",
+    str_detect(text_clean, "tramadol") ~ "tramadol",
+    TRUE ~ str_to_lower(str_extract(text_clean, "(?<=mcg\\s)\\w+"))
+  )
+}
+
+```
+
+
+```{r}
+#Clean up intraop variables
+#
+SnapshotKA2 <- SnapshotKA |> dplyr::filter(
+    Surgeon == "SM",
     str_detect(RegistryCohortName,"KneeArthritis"),
     SurgicalTreatment == "Surgical"
   ) |> dplyr::select(
-    Surgeon,
-    PreoperativePlan:FemurFixation,
-    TourniquetApplied: PatellarResurfacing
+    Anaesthetic,
+    SpinalAnaestheticComposition
+    ) |> dplyr::mutate(
+      SpinalAnaestheticComposition2 = case_when(
+        stringr::str_detect(str_to_lower(SpinalAnaestheticComposition),"marcian") ~ stringr::str_replace(str_to_lower(SpinalAnaestheticComposition),"marcian", "marcain"),
+        stringr::str_detect(str_to_lower(SpinalAnaestheticComposition),"heavy|spinal") ~ stringr::str_remove(str_to_lower(SpinalAnaestheticComposition), "heavy|spinal"),
+        .default = SpinalAnaestheticComposition
+      ),
+      SpinalAnaesth = if_else(
+    stringr::str_detect(str_to_lower(Anaesthetic),"spinal"),
+    "Yes",
+    "No"
   ),
-  by = "Surgeon",
-  missing = "no"
+   Spinalprimary_dose = extract_primary_dose(SpinalAnaestheticComposition2),
+    Spinalprimary_agent = extract_primary_agent(SpinalAnaestheticComposition2),
+    Spinalsecondary_dose = extract_secondary_dose(SpinalAnaestheticComposition2),
+    Spinalsecondary_agent = extract_secondary_agent(SpinalAnaestheticComposition2)
+    )
+
+```
+
+
+```{r}
+#| label: tbl-ka-intraop
+#| tbl-cap: "Summary of intraoperative variables in Knee Arthritis cohort"
+
+
+
+TableKAsurg <- gtsummary::tbl_summary(
+  SnapshotKA2 |> dplyr::select(
+    SpinalAnaesth,
+    Spinalprimary_agent,
+    Spinalprimary_dose,
+    Spinalsecondary_agent,
+    Spinalsecondary_dose
+    
+  ),
+  missing = "ifany"
 )
 
 knitr::knit_print(TableKAsurg)
