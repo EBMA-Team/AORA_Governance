@@ -217,14 +217,6 @@ MonitorLog <- googlesheets4::range_read(
   col_types = "Tcicccccccc"
   )
 
-MonitorLog <- googlesheets4::range_read(
-  ss = SheetIDs$DbSS,
-  sheet = "MonitorModuleLog", 
-  range = "A1:K",
-  col_names = TRUE, 
-  col_types = "Tcicccccccc"
-  )
-
 MonitorResponse <- googlesheets4::range_read(
   ss = SheetIDs$DbSS,
   sheet = "Monitoring", 
@@ -275,7 +267,7 @@ Snapshot <- openxlsx2::wb_to_df(
        stringr::str_detect(str_to_lower(SurgicalTreatment), "non", negate = TRUE) ~ "Surgical",
        stringr::str_detect(str_to_lower(SurgicalTreatment), "non") ~ "Non-Surgical"
   )
-  )|> unite(
+  ) |> unite(
   col = "CombID",
   sep = ".",
   c("PatientID","AffectedSide"),
@@ -300,7 +292,7 @@ OrthoCompass is is a clinical support system embedded within the practices of tw
 
 # Recruitment Flow by Region
 
-Flowcharts as per STROBE [@Vandenbroucke2007] and RECORD [@Benchimol2015] guidelines were generated for treatments enrolled into the Registry. Followup was set to eligibility at 6months.
+Flowcharts as per STROBE [@Vandenbroucke2007] and RECORD [@Benchimol2015] guidelines were generated for treatments enrolled into the Registry. Followup was set to eligibility at 12months followup.
 
 ```{r}
 
@@ -490,8 +482,6 @@ min_percent <- 10
 max_percent <- 100  # Or another value that encompasses all your data
 ```
 
-
-
 ```{r}
 #| label: fig-ka-miss
 #| fig-cap: "Missingness of KOOS12 by Timepoint in the Knee Arthritis cohort"
@@ -551,8 +541,6 @@ gg_miss_fct(PROMKA |> dplyr::select(KOOS12TotalScore,TimePoint), TimePoint) +
     name = "% Missing"     # Legend title
   )
 ```
-
-
 
 ```{r}
 #| label: fig-ha-miss
@@ -649,7 +637,6 @@ gg_miss_fct(PROMVR12, CreationYear) +
   )
 
 ```
-
 
 # Cohort Analysis
 
@@ -920,7 +907,6 @@ extract_secondary_agent <- function(text) {
 
 ```
 
-
 ```{r}
 #Clean up intraop variables
 #
@@ -949,7 +935,6 @@ SnapshotKA2 <- SnapshotKA |> dplyr::filter(
     )
 
 ```
-
 
 ```{r}
 #| label: tbl-ka-intraop
@@ -1028,11 +1013,7 @@ FigureKOOS_overlay <- PROMKA2 |> dplyr::filter(
 knitr::knit_print(FigureKOOS_overlay)
 ```
 
-
-
 Assessment of the *Knee Arthritis* cohort reveals that some patients enrolled in the cohort are scoring high on the KOOS JR preoperatively, intraoperative data requires backfilling and that there may be sufficient variation in surgical technique to warrant further investigation (e.g. patellar resurfacing, tourniquet use, soft tissue management).
-
-
 
 ```{r}
 #| label: fig-surv-ka
@@ -1051,7 +1032,6 @@ FigureSurvKA <- survfit2(Surv(Duration, Status) ~ SurgicalTreatment2,
 knitr::knit_print(FigureSurvKA)
 
 ```
-
 
 ```{r}
 #| label: tbl-surv-ka
@@ -1097,7 +1077,6 @@ TableHAdemo <- gtsummary::tbl_summary(
 knitr::knit_print(TableHAdemo)
 ```
 
-
 ```{r}
 #| label: tbl-ha-intraop
 #| tbl-cap: "Summary of intraoperative variables in Hip Arthritis cohort"
@@ -1118,7 +1097,6 @@ knitr::knit_print(TableHAsurg)
 
 
 ```
-
 
 ```{r}
 #| label: fig-hoos-ha
@@ -1176,7 +1154,6 @@ knitr::knit_print(FigureSurvHA)
 
 ```
 
-
 ```{r}
 #| label: tbl-surv-Ha
 #| tbl-cap: "Summary of Hip Arthritis Procedure Survival"
@@ -1193,6 +1170,72 @@ TableSurvHA <- tbl_survfit(
 knitr::knit_print(TableSurvHA)
 
 ```
+
+# Monitoring Module
+
+
+
+## Context
+
+## Flow
+
+## Response Patterns
+
+
+```{r}
+
+MonitorPlan2 <- MonitorPlan |> dplyr::filter(
+  #!is.na(Phone)
+  `Planned Run Status` == "Complete"
+)
+
+MonitorLog2 <- MonitorLog |> dplyr::filter(
+  TreatmentID %in% MonitorPlan2$`Treatment ID`
+) |> group_by(
+  TreatmentID
+) |> arrange(TimeStamp) |> 
+  mutate(Sequence = row_number()) |> 
+  ungroup() |>
+  unite(
+    col = "FormID",
+    c(TreatmentID,Sequence),
+    sep = ".",
+    na.rm = FALSE,
+    remove = FALSE
+  ) 
+
+MonitorResponse2 <- MonitorResponse |> dplyr::filter(
+  TreatmentID %in% MonitorLog2$TreatmentID
+) |> group_by(
+  TreatmentID
+  ) |> arrange(Timestamp) |> 
+  mutate(Sequence = row_number()) |> 
+  ungroup() |>
+  unite(
+    col = "FormID",
+    c(TreatmentID,Sequence),
+    sep = ".",
+    na.rm = FALSE,
+    remove = FALSE
+  ) |> mutate(
+    FormID2 = str_sub(`FormID [Office Use Only]`, 4)
+  )
+
+# MonitorRespNoMatch <- MonitorResponse |> dplyr::filter(
+#   !(TreatmentID %in% MonitorLog2$TreatmentID)
+# )
+
+# MonitorLog3 <- left_join(
+#   MonitorLog2,
+#   MonitorResponse2 |> dplyr::select(
+#     TreatmentID
+#   ),
+#   by = "TreatmentID"
+# )
+
+
+```
+
 
 # Interpretation
 
