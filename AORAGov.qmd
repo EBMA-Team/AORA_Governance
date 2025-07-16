@@ -1194,8 +1194,11 @@ MonitorLog2 <- MonitorLog |> dplyr::filter(
 ) |> group_by(
   TreatmentID
 ) |> arrange(TimeStamp) |> 
-  mutate(Sequence = row_number()) |> 
-  ungroup() |>
+  mutate(
+    Sequence = row_number(),
+    FormIDTrue = str_sub(MMLink, 132),
+    DateStamp = lubridate::as_date(TimeStamp)
+    ) |> ungroup() |>
   unite(
     col = "FormID",
     c(TreatmentID,Sequence),
@@ -1205,7 +1208,8 @@ MonitorLog2 <- MonitorLog |> dplyr::filter(
   ) 
 
 MonitorResponse2 <- MonitorResponse |> dplyr::filter(
-  TreatmentID %in% MonitorLog2$TreatmentID
+  TreatmentID %in% MonitorLog2$TreatmentID,
+  !is.na(TreatmentDate)
 ) |> group_by(
   TreatmentID
   ) |> arrange(Timestamp) |> 
@@ -1218,12 +1222,36 @@ MonitorResponse2 <- MonitorResponse |> dplyr::filter(
     na.rm = FALSE,
     remove = FALSE
   ) |> mutate(
-    FormID2 = str_sub(`FormID [Office Use Only]`, 4)
-  )
+    FormIDTrue = str_sub(`FormID [Office Use Only]`, 4)
+  ) |> group_by(
+    FormIDTrue
+  ) |> mutate(
+    ResponseCount = n(),
+    OutOfSchedule = if_else(
+      (DaysAfterSurgery == 8 | DaysAfterSurgery == 10 | DaysAfterSurgery == 12 | DaysAfterSurgery >= 14),
+      TRUE,
+      FALSE
+    ),
+    DateStamp = lubridate::as_date(Timestamp)
+  ) |> ungroup() |> arrange(FormIDTrue)
 
-# MonitorRespNoMatch <- MonitorResponse |> dplyr::filter(
-#   !(TreatmentID %in% MonitorLog2$TreatmentID)
-# )
+MonitorResponse3 <- MonitorResponse2 |> filter(
+      DaysAfterSurgery < 14,
+      OutOfSchedule == FALSE
+    ) |> group_by(
+      FormIDTrue
+      ) |> slice_min(
+      Sequence
+    ) |> ungroup()
+
+
+MonitorOOS <- MonitorResponse2 |> dplyr::filter(
+  OutOfSchedule == TRUE
+) |> group_by(
+  TreatmentID
+) |> arrange(
+  DaysAfterSurgery
+)
 
 # MonitorLog3 <- left_join(
 #   MonitorLog2,
@@ -1236,6 +1264,103 @@ MonitorResponse2 <- MonitorResponse |> dplyr::filter(
 
 ```
 
+```{r}
+
+# Data preparation (same as before)
+MonitorCountOut <- dplyr::summarise(
+  MonitorLog2,
+  Count = n(),
+  .by = DateStamp
+) |> arrange(
+  DateStamp
+) |> dplyr::mutate(
+  CumulativeCount = cumsum(Count),
+  DateStampNum = as.numeric(DateStamp)
+  ) 
+
+MonitorCountIn <- dplyr::summarise(
+  MonitorResponse3,
+  Count = n(),
+  .by = DateStamp
+) |> arrange(
+  DateStamp
+) |> dplyr::mutate(
+  CumulativeCount = cumsum(Count),
+  DateStampNum = as.numeric(DateStamp)
+  ) 
+
+MonitorCountAll <- left_join(
+  MonitorCountOut |> rename(
+    CumulativeOut = "CumulativeCount"
+  ),
+  MonitorCountIn |> dplyr::select(
+    DateStampNum,
+    CumulativeCount
+  ) |> rename(
+    CumulativeIn = "CumulativeCount"
+  ),
+  by = "DateStampNum"
+) |> 
+  arrange(DateStamp) |> 
+  # Handle missing values using lag for CumulativeIn, zero for CumulativeOut
+  mutate(
+    CumulativeIn = case_when(
+      is.na(CumulativeIn) & row_number() == 1 ~ 0,  # First row gets 0 if missing
+      is.na(CumulativeIn) ~ lag(CumulativeIn),      # Use previous value if missing
+      TRUE ~ CumulativeIn                           # Keep original value
+    ),
+    CumulativeOut = replace_na(CumulativeOut, 0)
+  ) |> 
+  # Fill forward any remaining NAs in CumulativeIn
+  fill(CumulativeIn, .direction = "down") |> 
+  # Reshape to long format for plotting
+  pivot_longer(
+    cols = c(CumulativeIn, CumulativeOut),
+    names_to = "Type",
+    values_to = "CumulativeCount"
+  ) |> 
+  mutate(
+    Type = str_remove(Type, "Cumulative"),
+    Type = factor(Type, levels = c("Out", "In"))
+  )
+
+# Create the plot
+Monitor_Cumulative <- ggplot(MonitorCountAll, aes(x = DateStamp, y = CumulativeCount, color = Type)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1.5, alpha = 0.7) +
+  # Add smooth curves for each type
+  geom_smooth(
+    method = "gam", 
+    formula = y ~ s(x, bs = "cs"), 
+    linewidth = 1.2, 
+    se = TRUE, 
+    alpha = 0.2
+  ) +
+  # Custom colors
+  scale_color_manual(
+    values = c("Out" = "#e74c3c", "In" = "#3498db"),
+    labels = c("Out" = "Messages Out", "In" = "Responses In")
+  ) +
+  # Labels and title
+  labs(
+    title = "Cumulative Message Counts Over Time",
+    x = "Date",
+    y = "Cumulative Count",
+    color = "Type"
+  ) +
+  # Theme
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold")
+  )
+
+# Print the plot
+knitr::knit_print(Monitor_Cumulative)
+```
 
 # Interpretation
 
