@@ -1205,7 +1205,16 @@ MonitorLog2 <- MonitorLog |> dplyr::filter(
     sep = ".",
     na.rm = FALSE,
     remove = FALSE
-  ) 
+  ) |> left_join(
+    STROBEInput |> dplyr::select(
+      TreatmentID,
+      SurgicalTreatment,
+      RegistryCohortName,
+      TreatmentType,
+      TreatmentStatus
+    ),
+    by = "TreatmentID"
+  )
 
 MonitorResponse2 <- MonitorResponse |> dplyr::filter(
   TreatmentID %in% MonitorLog2$TreatmentID,
@@ -1233,7 +1242,7 @@ MonitorResponse2 <- MonitorResponse |> dplyr::filter(
       FALSE
     ),
     DateStamp = lubridate::as_date(Timestamp)
-  ) |> ungroup() |> arrange(FormIDTrue)
+  ) |> ungroup() |> arrange(FormIDTrue) 
 
 MonitorResponse3 <- MonitorResponse2 |> filter(
       DaysAfterSurgery < 14,
@@ -1242,7 +1251,16 @@ MonitorResponse3 <- MonitorResponse2 |> filter(
       FormIDTrue
       ) |> slice_min(
       Sequence
-    ) |> ungroup()
+    ) |> ungroup() |> left_join(
+    STROBEInput |> dplyr::select(
+      TreatmentID,
+      SurgicalTreatment,
+      RegistryCohortName,
+      TreatmentType,
+      TreatmentStatus
+    ),
+    by = "TreatmentID"
+  )
 
 
 MonitorOOS <- MonitorResponse2 |> dplyr::filter(
@@ -1252,14 +1270,6 @@ MonitorOOS <- MonitorResponse2 |> dplyr::filter(
 ) |> arrange(
   DaysAfterSurgery
 )
-
-# MonitorLog3 <- left_join(
-#   MonitorLog2,
-#   MonitorResponse2 |> dplyr::select(
-#     TreatmentID
-#   ),
-#   by = "TreatmentID"
-# )
 
 
 ```
@@ -1361,6 +1371,592 @@ Monitor_Cumulative <- ggplot(MonitorCountAll, aes(x = DateStamp, y = CumulativeC
 # Print the plot
 knitr::knit_print(Monitor_Cumulative)
 ```
+
+```{r}
+
+# More robust function to create all cumulative count data at once
+create_all_cumulative_data <- function(out_data, in_data) {
+  
+  # Create a complete date sequence
+  all_dates <- seq(min(c(out_data$DateStamp, in_data$DateStamp), na.rm = TRUE),
+                   max(c(out_data$DateStamp, in_data$DateStamp), na.rm = TRUE),
+                   by = "day")
+  
+  # Count messages out by date and cohort - separate summarise for each cohort
+  CountOut_Total <- out_data |> 
+    dplyr::summarise(Count_Total = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  CountOut_Knee <- out_data |> 
+    filter(RegistryCohortName == "KneeArthritis") |>
+    dplyr::summarise(Count_Knee = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  CountOut_Hip <- out_data |> 
+    filter(RegistryCohortName == "HipArthritis") |>
+    dplyr::summarise(Count_Hip = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  # Count responses in by date and cohort - separate summarise for each cohort
+  CountIn_Total <- in_data |> 
+    dplyr::summarise(Count_Total = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  CountIn_Knee <- in_data |> 
+    filter(RegistryCohortName == "KneeArthritis") |>
+    dplyr::summarise(Count_Knee = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  CountIn_Hip <- in_data |> 
+    filter(RegistryCohortName == "HipArthritis") |>
+    dplyr::summarise(Count_Hip = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  # Create a base dataframe with all dates
+  base_dates <- tibble(DateStamp = all_dates, DateStampNum = as.numeric(all_dates))
+  
+  # Join all counts to the base dates
+  CountOut_Combined <- base_dates |>
+    left_join(CountOut_Total, by = "DateStamp") |>
+    left_join(CountOut_Knee, by = "DateStamp") |>
+    left_join(CountOut_Hip, by = "DateStamp") |>
+    mutate(
+      Count_Total = replace_na(Count_Total, 0),
+      Count_Knee = replace_na(Count_Knee, 0),
+      Count_Hip = replace_na(Count_Hip, 0),
+      CumulativeOut_Total = cumsum(Count_Total),
+      CumulativeOut_Knee = cumsum(Count_Knee),
+      CumulativeOut_Hip = cumsum(Count_Hip)
+    )
+  
+  CountIn_Combined <- base_dates |>
+    left_join(CountIn_Total, by = "DateStamp") |>
+    left_join(CountIn_Knee, by = "DateStamp") |>
+    left_join(CountIn_Hip, by = "DateStamp") |>
+    mutate(
+      Count_Total = replace_na(Count_Total, 0),
+      Count_Knee = replace_na(Count_Knee, 0),
+      Count_Hip = replace_na(Count_Hip, 0),
+      CumulativeIn_Total = cumsum(Count_Total),
+      CumulativeIn_Knee = cumsum(Count_Knee),
+      CumulativeIn_Hip = cumsum(Count_Hip)
+    )
+  
+  # Combine the data
+  CountAll <- CountOut_Combined |>
+    select(DateStamp, DateStampNum, starts_with("CumulativeOut")) |>
+    left_join(
+      CountIn_Combined |> select(DateStampNum, starts_with("CumulativeIn")),
+      by = "DateStampNum"
+    ) |>
+    # Filter to only dates where we have actual data (not empty days)
+    filter(DateStamp %in% c(out_data$DateStamp, in_data$DateStamp))
+  
+  return(CountAll)
+}
+
+# Optional: If you want to create individual plots for specific cohorts
+create_individual_plot <- function(long_data, cohort_name) {
+  filtered_data <- long_data |> filter(Cohort == cohort_name)
+  
+  ggplot(filtered_data, aes(x = DateStamp, y = CumulativeCount, color = Type)) +
+    geom_line(linewidth = 1) +
+    geom_point(size = 1.5, alpha = 0.7) +
+    geom_smooth(
+      method = "gam", 
+      formula = y ~ s(x, bs = "cs"), 
+      linewidth = 1.2, 
+      se = TRUE, 
+      alpha = 0.2
+    ) +
+    scale_color_manual(
+      values = c("Out" = "#e74c3c", "In" = "#3498db"),
+      labels = c("Out" = "Messages Out", "In" = "Responses In")
+    ) +
+    labs(
+      title = paste("Cumulative Message Counts Over Time -", cohort_name),
+      x = "Date",
+      y = "Cumulative Count",
+      color = "Type"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      axis.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_text(face = "bold")
+    )
+}
+
+# Example usage for individual plots if needed:
+# Monitor_Individual_Total <- create_individual_plot(MonitorCountAll_Long, "All Cohorts")
+# Monitor_Individual_Knee <- create_individual_plot(MonitorCountAll_Long, "Knee Arthritis")
+# Monitor_Individual_Hip <- create_individual_plot(MonitorCountAll_Long, "Hip Arthritis")
+
+
+
+```
+
+```{r}
+
+# Create all cumulative data at once (much more efficient!)
+CombinedCumulativeData <- create_all_cumulative_data(MonitorLog2, MonitorResponse3)
+
+```
+
+
+```{r}
+
+# Create a single long dataframe with all cohorts
+MonitorCountAll_Long <- CombinedCumulativeData |>
+  # Pivot to long format for all cohorts at once
+  pivot_longer(
+    cols = starts_with("Cumulative"),
+    names_to = c("Type", "Cohort"),
+    names_pattern = "Cumulative(Out|In)_(Total|Knee|Hip)",
+    values_to = "CumulativeCount"
+  ) |>
+  mutate(
+    Type = factor(Type, levels = c("Out", "In")),
+    Cohort = case_when(
+      Cohort == "Total" ~ "All Cohorts",
+      Cohort == "Knee" ~ "Knee Arthritis", 
+      Cohort == "Hip" ~ "Hip Arthritis"
+    ),
+    Cohort = factor(Cohort, levels = c("All Cohorts", "Knee Arthritis", "Hip Arthritis"))
+  )
+
+```
+
+```{r}
+#| label: fig-msgcount
+#| fig-cap: "Cumulative Message Counts Over Time by Cohort"
+
+# Create a single faceted plot
+Monitor_Cumulative_Faceted <- ggplot(MonitorCountAll_Long, 
+                                     aes(x = DateStamp, y = CumulativeCount, color = Type)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1.5, alpha = 0.7) +
+  geom_smooth(
+    method = "gam", 
+    formula = y ~ s(x, bs = "cs"), 
+    linewidth = 1.2, 
+    se = TRUE, 
+    alpha = 0.2
+  ) +
+  scale_color_manual(
+    values = c("Out" = "#e74c3c", "In" = "#3498db"),
+    labels = c("Out" = "Messages Out", "In" = "Responses In")
+  ) +
+  labs(
+    x = "Date",
+    y = "Cumulative Count",
+    color = "Message Type"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"),
+    strip.text = element_text(face = "bold")
+  ) +
+  facet_wrap(~Cohort, scales = "free_y")
+
+# Print the plot
+knitr::knit_print(Monitor_Cumulative_Faceted)
+```
+```{r}
+# More robust function to create all cumulative count data at once
+create_all_cumulative_data <- function(out_data, in_data) {
+  
+  # Create a complete date sequence
+  all_dates <- seq(min(c(out_data$DateStamp, in_data$DateStamp), na.rm = TRUE),
+                   max(c(out_data$DateStamp, in_data$DateStamp), na.rm = TRUE),
+                   by = "day")
+  
+  # Count messages out by date and cohort - separate summarise for each cohort
+  CountOut_Total <- out_data |> 
+    dplyr::summarise(Count_Total = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  CountOut_Knee <- out_data |> 
+    filter(RegistryCohortName == "KneeArthritis") |>
+    dplyr::summarise(Count_Knee = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  CountOut_Hip <- out_data |> 
+    filter(RegistryCohortName == "HipArthritis") |>
+    dplyr::summarise(Count_Hip = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  # Count responses in by date and cohort - separate summarise for each cohort
+  CountIn_Total <- in_data |> 
+    dplyr::summarise(Count_Total = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  CountIn_Knee <- in_data |> 
+    filter(RegistryCohortName == "KneeArthritis") |>
+    dplyr::summarise(Count_Knee = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  CountIn_Hip <- in_data |> 
+    filter(RegistryCohortName == "HipArthritis") |>
+    dplyr::summarise(Count_Hip = n(), .by = DateStamp) |>
+    arrange(DateStamp)
+  
+  # Create a base dataframe with all dates
+  base_dates <- tibble(DateStamp = all_dates, DateStampNum = as.numeric(all_dates))
+  
+  # Join all counts to the base dates
+  CountOut_Combined <- base_dates |>
+    left_join(CountOut_Total, by = "DateStamp") |>
+    left_join(CountOut_Knee, by = "DateStamp") |>
+    left_join(CountOut_Hip, by = "DateStamp") |>
+    mutate(
+      Count_Total = replace_na(Count_Total, 0),
+      Count_Knee = replace_na(Count_Knee, 0),
+      Count_Hip = replace_na(Count_Hip, 0),
+      CumulativeOut_Total = cumsum(Count_Total),
+      CumulativeOut_Knee = cumsum(Count_Knee),
+      CumulativeOut_Hip = cumsum(Count_Hip)
+    )
+  
+  CountIn_Combined <- base_dates |>
+    left_join(CountIn_Total, by = "DateStamp") |>
+    left_join(CountIn_Knee, by = "DateStamp") |>
+    left_join(CountIn_Hip, by = "DateStamp") |>
+    mutate(
+      Count_Total = replace_na(Count_Total, 0),
+      Count_Knee = replace_na(Count_Knee, 0),
+      Count_Hip = replace_na(Count_Hip, 0),
+      CumulativeIn_Total = cumsum(Count_Total),
+      CumulativeIn_Knee = cumsum(Count_Knee),
+      CumulativeIn_Hip = cumsum(Count_Hip)
+    )
+  
+  # Combine the data
+  CountAll <- CountOut_Combined |>
+    select(DateStamp, DateStampNum, starts_with("CumulativeOut")) |>
+    left_join(
+      CountIn_Combined |> select(DateStampNum, starts_with("CumulativeIn")),
+      by = "DateStampNum"
+    ) |>
+    # Filter to only dates where we have actual data (not empty days)
+    filter(DateStamp %in% c(out_data$DateStamp, in_data$DateStamp))
+  
+  return(CountAll)
+}
+
+```
+
+
+```{r}
+
+# Function to calculate response rates from combined data
+calculate_response_rates <- function(combined_data, rate_type = "daily") {
+  
+  if (rate_type == "daily") {
+    # Calculate daily response rates
+    response_rates <- combined_data |>
+      mutate(
+        # Calculate daily response rates (avoiding division by zero)
+        ResponseRate_Total = ifelse(CumulativeOut_Total > 0, 
+                                   CumulativeIn_Total / CumulativeOut_Total * 100, 0),
+        ResponseRate_Knee = ifelse(CumulativeOut_Knee > 0, 
+                                  CumulativeIn_Knee / CumulativeOut_Knee * 100, 0),
+        ResponseRate_Hip = ifelse(CumulativeOut_Hip > 0, 
+                                 CumulativeIn_Hip / CumulativeOut_Hip * 100, 0)
+      ) |>
+      select(DateStamp, DateStampNum, starts_with("ResponseRate")) |>
+      # Convert to long format
+      pivot_longer(
+        cols = starts_with("ResponseRate"),
+        names_to = "Cohort",
+        names_pattern = "ResponseRate_(.*)",
+        values_to = "ResponseRate"
+      ) |>
+      mutate(
+        Cohort = case_when(
+          Cohort == "Total" ~ "All Cohorts",
+          Cohort == "Knee" ~ "Knee Arthritis",
+          Cohort == "Hip" ~ "Hip Arthritis"
+        ),
+        Cohort = factor(Cohort, levels = c("All Cohorts", "Knee Arthritis", "Hip Arthritis"))
+      )
+    
+  } else if (rate_type == "weekly") {
+    # Calculate weekly response rates
+    response_rates <- combined_data |>
+      mutate(
+        Week = floor_date(DateStamp, "week"),
+        # Calculate weekly response rates
+        ResponseRate_Total = ifelse(CumulativeOut_Total > 0, 
+                                   CumulativeIn_Total / CumulativeOut_Total * 100, 0),
+        ResponseRate_Knee = ifelse(CumulativeOut_Knee > 0, 
+                                  CumulativeIn_Knee / CumulativeOut_Knee * 100, 0),
+        ResponseRate_Hip = ifelse(CumulativeOut_Hip > 0, 
+                                 CumulativeIn_Hip / CumulativeOut_Hip * 100, 0)
+      ) |>
+      # Take the last observation for each week (most recent cumulative rate)
+      group_by(Week) |>
+      slice_max(DateStamp, n = 1) |>
+      ungroup() |>
+      select(Week, starts_with("ResponseRate")) |>  # Remove DateStamp from select
+      # Convert to long format
+      pivot_longer(
+        cols = starts_with("ResponseRate"),
+        names_to = "Cohort",
+        names_pattern = "ResponseRate_(.*)",
+        values_to = "ResponseRate"
+      ) |>
+      mutate(
+        Cohort = case_when(
+          Cohort == "Total" ~ "All Cohorts",
+          Cohort == "Knee" ~ "Knee Arthritis",
+          Cohort == "Hip" ~ "Hip Arthritis"
+        ),
+        Cohort = factor(Cohort, levels = c("All Cohorts", "Knee Arthritis", "Hip Arthritis"))
+      ) |>
+      rename(DateStamp = Week)  # Now this won't cause a duplicate
+  }
+  
+  return(response_rates)
+}
+
+
+```
+
+
+```{r}
+
+# Function to create response rate plot
+create_response_rate_plot <- function(response_data, rate_type = "daily") {
+  
+  time_label <- ifelse(rate_type == "daily", "Daily", "Weekly")
+  
+  ggplot(response_data, aes(x = DateStamp, y = ResponseRate, color = Cohort)) +
+    geom_line(linewidth = 1) +
+    geom_point(size = 1.5, alpha = 0.7) +
+    # Add smooth trend line
+    geom_smooth(
+      method = "loess", 
+      span = 0.3,
+      linewidth = 1.2, 
+      se = TRUE, 
+      alpha = 0.2
+    ) +
+    # Custom colors for cohorts
+    scale_color_manual(
+      values = c(
+        "All Cohorts" = "#2c3e50",
+        "Knee Arthritis" = "#e74c3c", 
+        "Hip Arthritis" = "#3498db"
+      )
+    ) +
+    # Format y-axis as percentage
+    scale_y_continuous(
+      labels = scales::percent_format(scale = 1),
+      limits = c(0, NA)
+    ) +
+    # Labels and title
+    labs(
+      title = paste(time_label, "Response Rate Over Time by Cohort"),
+      x = "Date",
+      y = "Response Rate (%)",
+      color = "Cohort"
+    ) +
+    # Theme
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      axis.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_text(face = "bold"),
+      strip.text = element_text(face = "bold")
+    ) +
+    facet_wrap(~Cohort, scales = "free_y")
+}
+
+# Alternative function for overlaid plot (all cohorts on same panel)
+create_response_rate_overlay <- function(response_data, rate_type = "daily") {
+  
+  time_label <- ifelse(rate_type == "daily", "Daily", "Weekly")
+  
+  ggplot(response_data, aes(x = DateStamp, y = ResponseRate, color = Cohort)) +
+    geom_line(linewidth = 1) +
+    geom_point(size = 1.5, alpha = 0.7) +
+    # Add smooth trend line
+    geom_smooth(
+      method = "loess", 
+      span = 0.3,
+      linewidth = 1.2, 
+      se = TRUE, 
+      alpha = 0.2
+    ) +
+    # Custom colors for cohorts
+    scale_color_manual(
+      values = c(
+        "All Cohorts" = "#2c3e50",
+        "Knee Arthritis" = "#e74c3c", 
+        "Hip Arthritis" = "#3498db"
+      )
+    ) +
+    # Format y-axis as percentage
+    scale_y_continuous(
+      labels = scales::percent_format(scale = 1),
+      limits = c(0, NA)
+    ) +
+    # Labels and title
+    labs(
+      title = paste(time_label, "Response Rate Over Time by Cohort"),
+      x = "Date",
+      y = "Response Rate (%)",
+      color = "Cohort"
+    ) +
+    # Theme
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      axis.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_text(face = "bold")
+    )
+}
+
+# Optional: If you want to create individual plots for specific cohorts
+create_individual_plot <- function(long_data, cohort_name) {
+  filtered_data <- long_data |> filter(Cohort == cohort_name)
+  
+  ggplot(filtered_data, aes(x = DateStamp, y = CumulativeCount, color = Type)) +
+    geom_line(linewidth = 1) +
+    geom_point(size = 1.5, alpha = 0.7) +
+    geom_smooth(
+      method = "gam", 
+      formula = y ~ s(x, bs = "cs"), 
+      linewidth = 1.2, 
+      se = TRUE, 
+      alpha = 0.2
+    ) +
+    scale_color_manual(
+      values = c("Out" = "#e74c3c", "In" = "#3498db"),
+      labels = c("Out" = "Messages Out", "In" = "Responses In")
+    ) +
+    labs(
+      title = paste("Cumulative Message Counts Over Time -", cohort_name),
+      x = "Date",
+      y = "Cumulative Count",
+      color = "Type"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      axis.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      legend.position = "bottom",
+      legend.title = element_text(face = "bold")
+    )
+}
+
+```
+
+
+```{r}
+
+# Create response rate data and plots
+# Daily response rates
+ResponseRates_Daily <- calculate_response_rates(CombinedCumulativeData, "daily")
+ResponseRate_Daily_Plot <- create_response_rate_plot(ResponseRates_Daily, "daily")
+
+# Weekly response rates  
+ResponseRates_Weekly <- calculate_response_rates(CombinedCumulativeData, "weekly")
+ResponseRate_Weekly_Plot <- create_response_rate_plot(ResponseRates_Weekly, "weekly")
+
+# Overlay plots (all cohorts on same panel)
+ResponseRate_Daily_Overlay <- create_response_rate_overlay(ResponseRates_Daily, "daily")
+ResponseRate_Weekly_Overlay <- create_response_rate_overlay(ResponseRates_Weekly, "weekly")
+
+# Print the plots
+knitr::knit_print(ResponseRate_Daily_Plot)
+knitr::knit_print(ResponseRate_Weekly_Plot)
+knitr::knit_print(ResponseRate_Daily_Overlay)
+knitr::knit_print(ResponseRate_Weekly_Overlay)
+
+
+```
+
+```{r}
+
+# Optional: If you want to create individual plots for specific cohorts
+
+# Create all cumulative data at once (much more efficient!)
+CombinedCumulativeData <- create_all_cumulative_data(MonitorLog2, MonitorResponse3)
+
+# Create a single long dataframe with all cohorts
+MonitorCountAll_Long <- CombinedCumulativeData |>
+  # Pivot to long format for all cohorts at once
+  pivot_longer(
+    cols = starts_with("Cumulative"),
+    names_to = c("Type", "Cohort"),
+    names_pattern = "Cumulative(Out|In)_(Total|Knee|Hip)",
+    values_to = "CumulativeCount"
+  ) |>
+  mutate(
+    Type = factor(Type, levels = c("Out", "In")),
+    Cohort = case_when(
+      Cohort == "Total" ~ "All Cohorts",
+      Cohort == "Knee" ~ "Knee Arthritis", 
+      Cohort == "Hip" ~ "Hip Arthritis"
+    ),
+    Cohort = factor(Cohort, levels = c("All Cohorts", "Knee Arthritis", "Hip Arthritis"))
+  )
+
+
+```
+
+```{r}
+
+# Create a single faceted plot
+Monitor_Cumulative_Faceted <- ggplot(MonitorCountAll_Long, 
+                                     aes(x = DateStamp, y = CumulativeCount, color = Type)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1.5, alpha = 0.7) +
+  geom_smooth(
+    method = "gam", 
+    formula = y ~ s(x, bs = "cs"), 
+    linewidth = 1.2, 
+    se = TRUE, 
+    alpha = 0.2
+  ) +
+  scale_color_manual(
+    values = c("Out" = "#e74c3c", "In" = "#3498db"),
+    labels = c("Out" = "Messages Out", "In" = "Responses In")
+  ) +
+  labs(
+    title = "Cumulative Message Counts Over Time by Cohort",
+    x = "Date",
+    y = "Cumulative Count",
+    color = "Type"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"),
+    strip.text = element_text(face = "bold")
+  ) +
+  facet_wrap(~Cohort, scales = "free_y")
+
+# Print the plot
+knitr::knit_print(Monitor_Cumulative_Faceted)
+```
+
 
 # Interpretation
 
