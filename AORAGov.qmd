@@ -36,6 +36,7 @@ Analysis packages were loaded initially into the *R* environment.
 
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(# Load required packages
+  "mgcv",
   "ggforce",
   "ggdag",
   "ggmap",
@@ -1957,6 +1958,122 @@ Monitor_Cumulative_Faceted <- ggplot(MonitorCountAll_Long,
 knitr::knit_print(Monitor_Cumulative_Faceted)
 ```
 
+
+### Alerts
+
+```{r}
+MonitorResponse4 <- MonitorResponse3 |> rename(
+  Q1 = "Do you have an issue that is concerning you about your recovery?",
+  Q1b = "Please describe the issue/s",
+  Q1c = "Have you seen or are you thinking about seeing a health provider provider for this issue?",
+  Q2 = "How would you rate your recovery in the last 24 hours?",
+  Q3 = "How would you rate how well your pain has been controlled over the last 24 hours?",
+  Q4 = "How would you rate your WORST episode of pain over the last 24 hours?",
+  Q5 = "What pain killers have you taken in the last 24 hrs? [Panadol/Panadol Osteo]",
+  Q6 = "What pain killers have you taken in the last 24 hrs? [Non-steroidal anti-inflammatory]",
+  Q7 = "What pain killers have you taken in the last 24 hrs? [Other, stronger pain killers]",
+  Q8 = "What extra pain killers have you taken in the last 24 hrs?",
+  Q9 = "How far do you think you have walked in the last 24 hours? (metres)"
+) |> dplyr::mutate(
+  Alert1 = case_when(
+    stringr::str_detect(Q1, "No issues", negate = TRUE) | Q3 < 3 | Q4 > 7 | !is.na(Q1b) ~ "Alert",
+    .default = "Storage"
+    
+  )
+)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# Create weekly alert rate plot
+weekly_alert_rate <- MonitorResponse4 %>%
+  # Create week variable using floor_date to group by week
+  mutate(Week = floor_date(DateStamp, "week")) %>%
+  # Group by week and calculate metrics
+  group_by(Week) %>%
+  summarise(
+    Total_Responses = n(),
+    Alert_Responses = sum(Alert1 == "Alert", na.rm = TRUE),
+    Alert_Rate = Alert_Responses / Total_Responses,
+    .groups = "drop"
+  ) %>%
+  # Filter out weeks with very few responses (optional - adjust threshold as needed)
+  filter(Total_Responses >= 5)
+
+# Create the plot with trend line
+ggplot(weekly_alert_rate, aes(x = Week, y = Alert_Rate)) +
+  # Add raw data points and lines
+  geom_line(color = "red", alpha = 0.6, size = 0.8) +
+  geom_point(color = "red", alpha = 0.7, size = 1.5) +
+  # Add smooth trend line using spline
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), 
+              color = "darkblue", size = 1.2, se = TRUE, alpha = 0.3) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    limits = c(0, max(weekly_alert_rate$Alert_Rate) * 1.1)
+  ) +
+  scale_x_date(
+    date_labels = "%b %Y",
+    date_breaks = "2 months",
+    date_minor_breaks = "1 month"
+  ) +
+  labs(
+    title = "Alert Response Rate by Week",
+    subtitle = "Proportion of responses flagged as 'Alert' per week (with trend line)",
+    x = "Month",
+    y = "Alert Rate (%)",
+    caption = paste("Total responses:", nrow(MonitorResponse4), "| Blue line shows smoothed trend")
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12, color = "gray60"),
+    panel.grid.minor.x = element_line(color = "gray95", size = 0.3)
+  )
+
+# Calculate and report trend statistics
+library(mgcv)
+
+# Fit GAM model for trend analysis
+gam_model <- gam(Alert_Rate ~ s(as.numeric(Week)), data = weekly_alert_rate)
+trend_summary <- summary(gam_model)
+
+# Calculate overall trend direction
+first_quarter <- weekly_alert_rate %>% 
+  slice_head(n = ceiling(nrow(weekly_alert_rate) * 0.25)) %>%
+  summarise(avg_rate = mean(Alert_Rate))
+
+last_quarter <- weekly_alert_rate %>% 
+  slice_tail(n = ceiling(nrow(weekly_alert_rate) * 0.25)) %>%
+  summarise(avg_rate = mean(Alert_Rate))
+
+trend_direction <- if_else(last_quarter$avg_rate > first_quarter$avg_rate, "increasing", "decreasing")
+trend_magnitude <- abs(last_quarter$avg_rate - first_quarter$avg_rate)
+
+cat("TREND ANALYSIS:\n")
+cat("===============\n")
+cat("Overall trend direction:", trend_direction, "\n")
+cat("Magnitude of change:", scales::percent(trend_magnitude, accuracy = 0.1), "\n")
+cat("First quarter average:", scales::percent(first_quarter$avg_rate, accuracy = 0.1), "\n")
+cat("Last quarter average:", scales::percent(last_quarter$avg_rate, accuracy = 0.1), "\n")
+cat("GAM model R-squared:", round(trend_summary$r.sq, 3), "\n")
+cat("GAM model p-value:", format.pval(trend_summary$s.pv, digits = 3), "\n\n")
+
+cat("\nWeeks with highest alert rates:\n")
+print(weekly_alert_rate %>% 
+  arrange(desc(Alert_Rate)) %>% 
+  head(5) %>%
+  mutate(Alert_Rate_Pct = scales::percent(Alert_Rate, accuracy = 0.1)))
+
+cat("\nWeeks with most total responses:\n")
+print(weekly_alert_rate %>% 
+  arrange(desc(Total_Responses)) %>% 
+  head(5) %>%
+  mutate(Alert_Rate_Pct = scales::percent(Alert_Rate, accuracy = 0.1)))
+```
 
 # Interpretation
 
