@@ -1179,6 +1179,8 @@ The procedure survival of treatments captured in the registry are different depe
 
 ## Hip Arthritis
 
+The hip arthritis cohort captures all patients presenting with degenerative conditions of the femoracetabular joint to be assessed for suitability for arthroplasty or other surgery. The demographics of the cohort are summarised below.
+
 ```{r}
 #| label: tbl-ha-demographics
 #| tbl-cap: "Summary of demographics in Hip Arthritis cohort"
@@ -1250,6 +1252,8 @@ CupBrand2 = case_when(
 )
 )
 ```
+
+The intraoperative fields captured for hip arthritis surgery is captured below.
 
 ```{r}
 #| label: tbl-ha-intraop
@@ -1336,6 +1340,8 @@ FigureHOOS_overlay <- PROMHA2 |> dplyr::filter(
 knitr::knit_print(FigureHOOS_overlay)
 ```
 
+The trajectory of HOOS12 summary score shows stark differences in distributions over time, with a similar ceiling effect for surgical cases at longer followup.
+
 ```{r}
 #| label: fig-surv-ha
 #| fig-cap: "Survival curve for Hip Arthritis cases by treatment type"
@@ -1371,13 +1377,31 @@ knitr::knit_print(TableSurvHA)
 
 ```
 
+Although the survival of Hip Arthritis cases follows a similar trend to the Knee Arthritis cohort with a suspicion that surgical revisions are not fully captured by the registry, the surgery recommended group show a greater reluctance to follow through to surgery compared to those referred to non-surgical therapies alone.
+
 # Monitoring Module
 
 ## Context
 
+The AORA registry contains an additional messaging module that switches on immediate after surgery for surgical cases and sends a daily sms for the first week after surgery, and days 9, 11 and 13 in the second week, for a total of 10 in the fortnight. The monitoring module retrieves responses on pain and pain control, as well as engagement with healthcare providers, and free-text descriptions of any issues the patient is facing. The module commenced operation in July 2020 and has been running in parallel with the registry to the present.
+
 ## Flow
 
+Confirmed arthroplasty cases are transferred to a table via filters on the registry database. Bilateral cases are reduced to one entry on the monitoring module to mitigate message duplication. On schedule, a function reviews the table and sends messages to cases that need them at \~1300 each day. Responses are returned through the system and simple filters embedded in code to review each entry. The filters are;
+
+-   A pain score above 7 (out of 10)
+
+-   Any response other than "no issues"
+
+-   Self-rated quality of pain control \<3 (max 5)
+
+-   Self-rated recovery progress of \<3 (max 5)
+
+If a response meets any of these criteria is sent to a Slack channel that is visible to the operating surgeon, who can decide to followup with the patient by phone or other means as appropriate.
+
 ## Response Patterns
+
+Although a response to every message sent is not expected in reality, the expectation that patients will respond to every daily message is used to calculate response rates over time.
 
 ```{r}
 
@@ -1667,6 +1691,8 @@ Monitor_Cumulative_Faceted <- ggplot(MonitorCountAll_Long,
 knitr::knit_print(Monitor_Cumulative_Faceted)
 ```
 
+@fig-msgcount shows the cumulative total messages sent by the system from inception, and the cumulative volume of responses received via the links provided in the sms. I have not removed multiple responses from a patient to the same link.
+
 ```{r}
 # More robust function to create all cumulative count data at once
 create_all_cumulative_data <- function(out_data, in_data) {
@@ -1834,7 +1860,7 @@ create_response_rate_plot <- function(response_data, rate_type = "daily") {
   
   time_label <- ifelse(rate_type == "daily", "Daily", "Weekly")
   
-  ggplot(response_data, aes(x = DateStamp, y = ResponseRate, color = Cohort)) +
+ggplot(response_data, aes(x = DateStamp, y = ResponseRate, color = Cohort)) +
     geom_line(linewidth = 1) +
     geom_point(size = 1.5, alpha = 0.7) +
     # Add smooth trend line
@@ -1878,111 +1904,39 @@ create_response_rate_plot <- function(response_data, rate_type = "daily") {
     facet_wrap(~Cohort, scales = "free_y")
 }
 
-# Alternative function for overlaid plot (all cohorts on same panel)
-create_response_rate_overlay <- function(response_data, rate_type = "daily") {
-  
-  time_label <- ifelse(rate_type == "daily", "Daily", "Weekly")
-  
-  ggplot(response_data, aes(x = DateStamp, y = ResponseRate, color = Cohort)) +
-    geom_line(linewidth = 1) +
-    geom_point(size = 1.5, alpha = 0.7) +
-    # Add smooth trend line
-    geom_smooth(
-      method = "loess", 
-      span = 0.3,
-      linewidth = 1.2, 
-      se = TRUE, 
-      alpha = 0.2
-    ) +
-    # Custom colors for cohorts
-    scale_color_manual(
-      values = c(
-        "All Cohorts" = "#2c3e50",
-        "Knee Arthritis" = "#e74c3c", 
-        "Hip Arthritis" = "#3498db"
-      )
-    ) +
-    # Format y-axis as percentage
-    scale_y_continuous(
-      labels = scales::percent_format(scale = 1),
-      limits = c(0, NA)
-    ) +
-    # Labels and title
-    labs(
-      title = paste(time_label, "Response Rate Over Time by Cohort"),
-      x = "Date",
-      y = "Response Rate (%)",
-      color = "Cohort"
-    ) +
-    # Theme
-    theme_minimal() +
-    theme(
-      plot.title = element_text(face = "bold", size = 14),
-      axis.title = element_text(face = "bold"),
-      panel.grid.minor = element_blank(),
-      legend.position = "bottom",
-      legend.title = element_text(face = "bold")
-    )
-}
+```
 
-# Optional: If you want to create individual plots for specific cohorts
-create_individual_plot <- function(long_data, cohort_name) {
-  filtered_data <- long_data |> filter(Cohort == cohort_name)
-  
-  ggplot(filtered_data, aes(x = DateStamp, y = CumulativeCount, color = Type)) +
-    geom_line(linewidth = 1) +
-    geom_point(size = 1.5, alpha = 0.7) +
-    geom_smooth(
-      method = "gam", 
-      formula = y ~ s(x, bs = "cs"), 
-      linewidth = 1.2, 
-      se = TRUE, 
-      alpha = 0.2
-    ) +
-    scale_color_manual(
-      values = c("Out" = "#e74c3c", "In" = "#3498db"),
-      labels = c("Out" = "Messages Out", "In" = "Responses In")
-    ) +
-    labs(
-      title = paste("Cumulative Message Counts Over Time -", cohort_name),
-      x = "Date",
-      y = "Cumulative Count",
-      color = "Type"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(face = "bold", size = 14),
-      axis.title = element_text(face = "bold"),
-      panel.grid.minor = element_blank(),
-      legend.position = "bottom",
-      legend.title = element_text(face = "bold")
-    )
-}
+```{r}
+#| label: fig-responsedaily
+#| fig-cap: "Daily response rate separated by cohorts over time"
+
+
+# Daily response rates
+ResponseRates_Daily <- calculate_response_rates(CombinedCumulativeData, "daily")
+ResponseRate_Daily_Plot <- create_response_rate_plot(ResponseRates_Daily, "daily")
+
+knitr::knit_print(ResponseRate_Daily_Plot)
 
 ```
 
 ```{r}
+#| label: fig-responseweekly
+#| fig-cap: "Weekly response rate separated by cohorts over time"
 
-# Create response rate data and plots
-# Daily response rates
-ResponseRates_Daily <- calculate_response_rates(CombinedCumulativeData, "daily")
-ResponseRate_Daily_Plot <- create_response_rate_plot(ResponseRates_Daily, "daily")
 
 # Weekly response rates  
 ResponseRates_Weekly <- calculate_response_rates(CombinedCumulativeData, "weekly")
 ResponseRate_Weekly_Plot <- create_response_rate_plot(ResponseRates_Weekly, "weekly")
 
-
-
-# Print the plots
-knitr::knit_print(ResponseRate_Daily_Plot)
 knitr::knit_print(ResponseRate_Weekly_Plot)
-
-
 
 ```
 
+The response rates for both cohorts have recently stabilised at \~50%, the hip cohort improving over time, in contrast to the knee cohort for both daily @fig-responsedaily and weekly @fig-responseweekly rates.
+
 ### Alerts
+
+The rate at which patient responses were presented to the surgeon through the internal messaging platform was also calculated.
 
 ```{r}
 MonitorResponse4 <- MonitorResponse3 |> rename(
@@ -2079,6 +2033,12 @@ p1 <- ggplot(weekly_alert_rate_combined |> dplyr::filter(!is.na(RegistryCohortNa
 knitr::knit_print(p1)
 ```
 
+The fitted trend lines in @fig-alert show a significant overall reduction in alert rates over time. Considering that the response rate has remained recently stable over time, this may suggest improved care during acute recovery or longer hospital length of stay.
+
 # Interpretation
+
+-   The registry is coming towards end of life with respect to HREC approval
+
+-   
 
 # Recommendations
