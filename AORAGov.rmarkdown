@@ -25,9 +25,11 @@ execute:
   message: false
 ---
 
+
 # Preamble
 
 The following analysis is a report on the activity, quality and data contained in the AORA registry.
+
 
 ```{r}
 #| label: load-packages
@@ -76,7 +78,9 @@ pacman::p_load(# Load required packages
   
 ```
 
+
 Access to the AORA datasets was pre-authorised.
+
 
 ```{r}
 #| label: auth2
@@ -93,7 +97,9 @@ googledrive::drive_auth(
   )
 ```
 
+
 A function was generated to retrieve files to call on later in the analysis for processing data imports.
+
 
 ```{r}
 #| label: folder
@@ -137,7 +143,9 @@ get_specific_snapshot <- function(folder_name, base_folder_id = base_folder_id1)
 }
 ```
 
+
 Data was retrieved from live database tables. Source files were specified and stored as global variables to call on in further functions.
+
 
 ```{r}
 #| label: live-table
@@ -227,7 +235,9 @@ MonitorResponse <- googlesheets4::range_read(
 
 ```
 
+
 A static registry snapshot was retrieved and formatted based on the fixed date of preparation of the snapshot (17-Jun-2025).
+
 
 ```{r}
 
@@ -285,6 +295,7 @@ STROBEInput <- openxlsx2::wb_to_df(
 
 ```
 
+
 # Context
 
 The Arthroplasty Outcomes in Regional Australia (AORA) registry has been in operation since June 2020, collecting KneeArthritis and HipArthritis presentations to a private clinic in Grafton, NSW. The setup of the registry is detailed on the [registry wiki](https://sites.google.com/ebma.com.au/aora-registry-wiki/home). The registry started with two surgeons contributing with one surgeon stopping participation in December 2022.
@@ -298,6 +309,7 @@ The registry has HREC approval until **21-Oct-2025** and the HREC has recommende
 # Recruitment Flow by Region
 
 Flowcharts as per STROBE [@Vandenbroucke2007] and RECORD [@Benchimol2015] guidelines were generated for treatments enrolled into the Registry. Followup was set to eligibility at 12months followup.
+
 
 ```{r}
 
@@ -401,7 +413,9 @@ knitr::knit_print(STROBEPlot1)
 
 ```
 
+
 Cumulative recruitment over time was plotted from Registry inception to the present.
+
 
 ```{r}
 #| label: fig-progress
@@ -450,6 +464,7 @@ knitr::knit_print(cumulative_plot)
 
 ```
 
+
 The trend in @fig-progress shows a reduction in recruitment rates to the registry as inclusion criteria have been refined and improved specificity in bringing cases into the registry has been achieved.
 
 # Missingness and Engagement
@@ -459,6 +474,7 @@ Calculations have been made regarding the capture rate for PROMs at set timepoin
 ## Baseline and Intraoperative
 
 Patients are enrolled to a registry cohort and sent relevant questionnaires for their presentation around their initial consultation, or prior to surgery to establish a baseline. The referral pathways for surgery have been fluid over time and the participation of other surgeons to intraoperative data collection has been absent, therefore the missingness was calculated only for surgical cases treated by the participating surgeon.
+
 
 ```{r}
 #| label: fig-baseline-miss
@@ -480,11 +496,13 @@ gg_miss_fct(Snapshot |> dplyr::filter(
 
 ```
 
+
 Missingness for baseline PROMs (represented by VR12) and intraoperative data is captured in @fig-baseline-miss. Overall, the patient response rate at baseline is \~65%. Intraoperative data missingness may be have multiple causal pathways - some may have been missed by the operating surgeon, or that there is a proportion of non-arthroplasty surgical cases included in the cohort dataset.
 
 ## Patient-reported Outcomes by TimePoint
 
 Patients are sent sms around their surgical anniversay at the times illustrated in the figures below.
+
 
 ```{r}
 min_percent <- 10
@@ -611,11 +629,13 @@ gg_miss_fct(PROMHA |> dplyr::select(HOOS12TotalScore,TimePoint), TimePoint) +
   )
 ```
 
+
 The cumulative results in @fig-ka-miss and @fig-ha-miss illustrate the difficulty in engaging patients beyond short term followup.
 
 ## Baseline by Year
 
 Patient responses to baseline scores were assessed over time. The VR12 is a *general* health questionnaire that is presented to *all* patients enrolled in the registry, regardless of cohort.
+
 
 ```{r}
 #| label: fig-vr12-missbaseka
@@ -680,11 +700,13 @@ gg_miss_fct(PROMVR12, CreationYear) +
   )
 ```
 
+
 The missingness rates for @fig-vr12-missbaseka and @fig-vr12-missbaseha show declining engagement rates over the last two years of operation
 
 # Cohort Analysis
 
 The VR12 component scores were compared between cohorts at baseline.
+
 
 ```{r}
 #| label: fig-vr12pcs-cohort
@@ -720,7 +742,9 @@ knitr::knit_print(FigureVR12MCS)
 
 ```
 
+
 Between-cohort variability is observed for the Physical Component Score of the VR12 (@fig-vr12pcs-cohort), but not as pronounced for the Mental Component Score (@fig-vr12mcs-cohort). Most notable is the high variation within all cohorts for both component scores.
+
 
 ```{r}
 
@@ -768,8 +792,6 @@ PROMMODEM1 <- PROMMODEM |> dplyr::select(
 )
 
 ```
-
-
 
 ```{r}
 #| label: fig-modempre1
@@ -854,9 +876,11 @@ FigModemP3 <- ggplot(PROMMODEM1 |> dplyr::filter(!is.na(MODEMPQ3), SurgicalTreat
 knitr::knit_print(FigModemP3)
 ```
 
+
 ## Knee Arthritis
 
 The demographics for surgical cases in the Knee Arthritis cohort are presented. 
+
 
 ```{r}
 #| label: tbl-ka-demographics
@@ -947,7 +971,6 @@ SnapshotKA2 <- SnapshotKA |> dplyr::filter(
 
 ```
 
-
 ```{r}
 #| label: ka-intraop-clean
 
@@ -968,8 +991,6 @@ BearingType2 = case_when(
 )
 )
 ```
-
-
 
 ```{r}
 #| label: tbl-ka-intraop
@@ -1021,8 +1042,6 @@ knitr::knit_print(TableKAsurg)
 
 
 ```
-
-
 
 ```{r}
 #| label: fig-koos-ka
@@ -1077,7 +1096,6 @@ FigureKOOS_overlay <- PROMKA2 |> dplyr::filter(
 
 knitr::knit_print(FigureKOOS_overlay)
 ```
-
 
 ```{r}
 #| label: fig-kneeling
@@ -1139,7 +1157,9 @@ knitr::knit_print(FigModem1Pre)
 
 
 
+
 Assessment of the *Knee Arthritis* cohort reveals that some patients enrolled in the cohort are scoring high on the KOOS JR preoperatively, intraoperative data requires backfilling and that there may be sufficient variation in surgical technique to warrant further investigation (e.g. patellar resurfacing, tourniquet use, soft tissue management).
+
 
 ```{r}
 #| label: fig-surv-ka
@@ -1178,7 +1198,9 @@ knitr::knit_print(TableSurvKA)
 
 
 
+
 ## Hip Arthritis
+
 
 ```{r}
 #| label: tbl-ha-demographics
@@ -1204,7 +1226,6 @@ TableHAdemo <- gtsummary::tbl_summary(
 
 knitr::knit_print(TableHAdemo)
 ```
-
 
 ```{r}
 #Clean up intraop variables
@@ -1300,8 +1321,6 @@ knitr::knit_print(TableHAsurg)
 
 ```
 
-
-
 ```{r}
 #| label: fig-hoos-ha
 #| fig-cap: "Summary of HOOS12 by Timepoint"
@@ -1375,6 +1394,7 @@ knitr::knit_print(TableSurvHA)
 
 ```
 
+
 # Monitoring Module
 
 ## Context
@@ -1382,6 +1402,7 @@ knitr::knit_print(TableSurvHA)
 ## Flow
 
 ## Response Patterns
+
 
 ```{r}
 
@@ -1986,7 +2007,9 @@ knitr::knit_print(ResponseRate_Weekly_Plot)
 
 ```
 
+
 ### Alerts
+
 
 ```{r}
 MonitorResponse4 <- MonitorResponse3 |> rename(
@@ -2083,6 +2106,8 @@ p1 <- ggplot(weekly_alert_rate_combined |> dplyr::filter(!is.na(RegistryCohortNa
 knitr::knit_print(p1)
 ```
 
+
 # Interpretation
 
 # Recommendations
+
