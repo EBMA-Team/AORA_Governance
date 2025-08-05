@@ -769,8 +769,6 @@ PROMMODEM1 <- PROMMODEM |> dplyr::select(
 
 ```
 
-
-
 ```{r}
 #| label: fig-modempre1
 #| fig-cap: "Expectations of symptom relief in surgical cases by Cohort captured by pre-treatment MODEMs"
@@ -856,7 +854,7 @@ knitr::knit_print(FigModemP3)
 
 ## Knee Arthritis
 
-The demographics for surgical cases in the Knee Arthritis cohort are presented. 
+The demographics for surgical cases in the Knee Arthritis cohort are presented below.
 
 ```{r}
 #| label: tbl-ka-demographics
@@ -882,6 +880,8 @@ TableKAdemo <- gtsummary::tbl_summary(
 
 knitr::knit_print(TableKAdemo)
 ```
+
+Each cohort is broken down into non-surgical cases, cases that have been offered surgery but have yet to take up the offer and surgical cases (@tbl-ka-demographics).
 
 ```{r}
 
@@ -947,7 +947,6 @@ SnapshotKA2 <- SnapshotKA |> dplyr::filter(
 
 ```
 
-
 ```{r}
 #| label: ka-intraop-clean
 
@@ -969,7 +968,7 @@ BearingType2 = case_when(
 )
 ```
 
-
+The intraoperative variables captured for surgeries in the Knee Arthritis cohort are summarised below.
 
 ```{r}
 #| label: tbl-ka-intraop
@@ -999,6 +998,8 @@ knitr::knit_print(TableKAsurg1)
 
 ```
 
+In addition, variables extracted from the free-text description of pain relief used during Knee Arthritis surgeries are summarised below.
+
 ```{r}
 #| label: tbl-ka-painrelief
 #| tbl-cap: "Summary of intraoperative variables in Knee Arthritis cohort"
@@ -1022,7 +1023,7 @@ knitr::knit_print(TableKAsurg)
 
 ```
 
-
+The KOOS12 is captured for all cases within the Knee Arthritis cohort, with the distributions at each timepoint shown below.
 
 ```{r}
 #| label: fig-koos-ka
@@ -1078,6 +1079,7 @@ FigureKOOS_overlay <- PROMKA2 |> dplyr::filter(
 knitr::knit_print(FigureKOOS_overlay)
 ```
 
+The KOOS12 summary score illustrated in @fig-koos-ka demonstrates potential ceiling efffects in surgical cases at later timepoints, but importantly identifies stark differences between patient subgroups with similar diagnoses over time.
 
 ```{r}
 #| label: fig-kneeling
@@ -1136,10 +1138,7 @@ FigModem1Pre <- ggplot(
 knitr::knit_print(FigModem1Pre)
 ```
 
-
-
-
-Assessment of the *Knee Arthritis* cohort reveals that some patients enrolled in the cohort are scoring high on the KOOS JR preoperatively, intraoperative data requires backfilling and that there may be sufficient variation in surgical technique to warrant further investigation (e.g. patellar resurfacing, tourniquet use, soft tissue management).
+The cohort results to date demonstrate that more than 50% of cases undergoing surgery for Knee Arthritis in the registry report moderate to no difficulties in kneeling at the 6 week followup (@fig-kneeling).
 
 ```{r}
 #| label: fig-surv-ka
@@ -1176,7 +1175,7 @@ knitr::knit_print(TableSurvKA)
 
 ```
 
-
+The procedure survival of treatments captured in the registry are different depending on the treatment classification @fig-surv-ka . Importantly, it is likely that the rate of surgical failures\|revisions is under-reported in this registry, as the ability to detect subsequent revisions for patients that go to other surgeons is limited to those that practice at SOC in Grafton. A key finding of the survival curves is that the rate of conversion to surgery for patients that have or have not been recommended surgery as a treatment option have similar rates (failure) of conversion to surgery over a \~3 year period after the initial consulation.
 
 ## Hip Arthritis
 
@@ -1204,7 +1203,6 @@ TableHAdemo <- gtsummary::tbl_summary(
 
 knitr::knit_print(TableHAdemo)
 ```
-
 
 ```{r}
 #Clean up intraop variables
@@ -1299,8 +1297,6 @@ knitr::knit_print(TableHAsurg)
 
 
 ```
-
-
 
 ```{r}
 #| label: fig-hoos-ha
