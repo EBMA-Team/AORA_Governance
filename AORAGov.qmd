@@ -18,6 +18,8 @@ format:
     toc: true
     number-sections: true
     code-fold: true
+    link-external-newwindow: true
+    link-external-icon: true
     
 execute: 
   echo: false
