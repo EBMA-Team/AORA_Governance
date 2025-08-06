@@ -848,6 +848,70 @@ FigModemP3 <- ggplot(PROMMODEM1 |> dplyr::filter(!is.na(MODEMPQ3), SurgicalTreat
 knitr::knit_print(FigModemP3)
 ```
 
+## Complications
+
+```{r}
+
+
+SnapshotSurg <- Snapshot |> dplyr::filter(
+  SurgicalTreatment2 == "Surgical",
+  Surgeon == "SM"
+) |> dplyr::select(
+  TreatmentID,
+  RegistryCohortName,
+  DateTreatment,
+  TreatmentStatus,
+  TreatmentStatusNotes,
+  DateStatusChange,
+  ComplicationOccurrence,
+  DateOfOccurrence,
+  ComplicationNature,
+  ReoperationProcedure,
+  ReoperationProcedureDate
+) |> mutate(
+  ComplicationOccur2 = if_else(
+    is.na(ComplicationOccurrence),
+    "No",
+    ComplicationOccurrence
+  ),
+  OccurDelay =  as.numeric(as.duration(interval(ymd(DateTreatment), ymd(DateOfOccurrence))),"days"),
+  Followup = if_else(
+    is.na(DateStatusChange),
+    as.numeric(as.duration(interval(ymd(DateTreatment), ymd(CurrentDate))),"days"),
+    as.numeric(as.duration(interval(ymd(DateTreatment), ymd(DateStatusChange))),"days")
+  )
+)
+
+
+```
+
+```{r}
+#| label: tbl-comp
+#| tbl-cap: "Summary of complications incidence after surgery separated by cohort"
+
+TableComp <- gtsummary::tbl_summary(
+  SnapshotSurg |> dplyr::select(
+    RegistryCohortName,
+    ComplicationOccur2,
+    OccurDelay,
+    Followup
+  ),
+  by = "RegistryCohortName",
+  missing = "no"
+) |>
+  modify_footnote_body(
+    footnote = "Days",
+    columns = "label",
+    rows = variable == c("OccurDelay","Followup") & row_type == "label"
+  ) |> add_overall()
+
+knitr::knit_print(TableComp)
+
+
+```
+
+Adverse events were detected in 16% of surgical cases performed by SM over the life of the registry as shown in @tbl-comp, with an average detection with 14 days of surgery and 50% of cases detected within 60 days, with some instances for the Knee Arthritis occurring later than Hip Arthritis.
+
 ## Knee Arthritis
 
 The demographics for surgical cases in the Knee Arthritis cohort are presented below.
@@ -2035,6 +2099,28 @@ The fitted trend lines in @fig-alert show a significant overall reduction in ale
 
 -   The registry is coming towards end of life with respect to HREC approval
 
--   
+-   PROMs capture ranges from \~ 70% (preoperative) to 50% for surgical cases at most postoperative timepoints.
+
+-   Patients undergoing surgery present with reasonably high expectations of symptom relief and this is largely met as reflected in satisfaction postoperatively
+
+-   AORA contains a subgroup within each cohort that have been offered surgery, but tend to take it up at the same rate as patients that have been treated nonoperatively initially
+
+-   Surgical and non-surgical cases display starkly different patterns of recovery in joint-specific PROMs over time
+
+-   More than half of Knee Arthritis surgical cases report moderate to no difficulty with kneeling at 6 weeks
+
+-   Complications that represent to the clinic have been detected, but surgical failures may be under reported in this registry
+
+-   The monitoring module maintains a steady response rate, although these differ between cohorts, but demonstrates potential improvements in acute care over time
 
 # Recommendations
+
+-   Review initial registry results and consider investment in key papers on outcomes of interest
+
+    -   Consider a comparison of clinical outcomes to historical controls previously published
+
+-   Review intended use of registry data and consider
+
+    -   EBMA offering
+
+    -   Continuing AORA with modifications
