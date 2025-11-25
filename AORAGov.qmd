@@ -7,7 +7,7 @@ type: "website"
 number-sections: true
 number-depth: 3
 date: "2025-Sep-03"
-date-modified: "2025-Sep-03"
+date-modified: "2025-Oct-01"
 
 bibliography: AORAGov references.bib
 
@@ -2126,3 +2126,30 @@ The fitted trend lines in @fig-alert show a significant overall reduction in ale
     -   EBMA offering
 
     -   Continuing AORA with modifications
+
+# Supplementary
+
+## CR vs Flex
+
+```{r}
+
+GMKSubset <- SnapshotKA |> filter(
+  str_detect(str_to_lower(FemurBrand),"gmk|gmc|sph*|medacta")
+) |> dplyr::select(
+  TreatmentID,
+  DateTreatment,
+  AffectedSide,
+  PreoperativePlan:FemurFixation
+)
+
+GMKOutset <- SnapshotKA |> filter(
+  !(TreatmentID %in% GMKSubset$TreatmentID)
+) |> dplyr::select(
+  TreatmentID,
+  DateTreatment,
+  AffectedSide,
+  PreoperativePlan:FemurFixation
+)
+```
+
+T
