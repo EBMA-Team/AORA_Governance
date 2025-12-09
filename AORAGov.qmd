@@ -36,6 +36,8 @@ The following analysis is a report on the activity, quality and data contained i
 
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(# Load required packages
+  "patchwork",
+  "nnet",
   "mgcv",
   "ggforce",
   "ggdag",
@@ -227,6 +229,18 @@ MonitorResponse <- googlesheets4::range_read(
   )
 
 
+
+```
+
+```{r}
+
+KneeIntraop <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Knee Arthritis Treatments", 
+  range = "A2:X",
+  col_names = TRUE, 
+  col_types = "Tccccccccccccccccccccncc"
+  )
 ```
 
 A static registry snapshot was retrieved and formatted based on the fixed date of preparation of the snapshot (31-Aug-2025).
@@ -322,7 +336,6 @@ STROBEFlow2 <- STROBEInput |>
       dplyr::mutate(
         across(contains("Date"), lubridate::ymd)
       ),
-    # Explicitly specify join column
     by = "TreatmentID"
   ) |> dplyr::mutate(
     TreatmentStatus2 = if_else(
@@ -2133,23 +2146,454 @@ The fitted trend lines in @fig-alert show a significant overall reduction in ale
 
 ```{r}
 
-GMKSubset <- SnapshotKA |> filter(
-  str_detect(str_to_lower(FemurBrand),"gmk|gmc|sph*|medacta")
-) |> dplyr::select(
-  TreatmentID,
-  DateTreatment,
-  AffectedSide,
-  PreoperativePlan:FemurFixation
+
+
+Snapshot3 <- STROBEFlow3 |> filter(
+  arm3 == "KneeArthritis",
+  !is.na(followup)
+) |> left_join(
+  KneeIntraop |> dplyr::select(
+    -Timestamp
+  ),
+  join_by(trialno == `Treatment ID`)
+) |> rename_with(~ str_replace_all(.x, " ", "")) |> rename(
+  TreatmentID = "trialno"
+) |> left_join(
+  Snapshot |> dplyr::select(
+    TreatmentID,
+    starts_with("KOOS") & contains("TotalScore"),
+    Kneeling_3months,
+    starts_with("KOOS") & contains("DailyLiving") & contains("3months"),
+    AgeAtTreatment,
+    Sex
+  ),
+  by = "TreatmentID"
 )
 
-GMKOutset <- SnapshotKA |> filter(
-  !(TreatmentID %in% GMKSubset$TreatmentID)
-) |> dplyr::select(
-  TreatmentID,
-  DateTreatment,
-  AffectedSide,
-  PreoperativePlan:FemurFixation
+BearingType <- distinct(Snapshot3, BearingType)
+
+GMKSubset <- Snapshot3 |> filter(
+  str_detect(str_to_lower(FemurBrand),"gmk|gmc|sph*|medacta"),
+  str_detect(str_to_lower(BearingType),"medial")
+) |> dplyr::mutate(
+CRTiming = case_when(
+  DateTreatment <= ymd("2022-Nov-02") ~ "Pre",
+  DateTreatment >= ymd("2022-Nov-02") ~ "Post"
+),
+CRTiming = forcats::fct(
+  CRTiming,
+  levels = c("Pre","Post")
 )
+)
+# 
+# |> dplyr::select(
+#   TreatmentID,
+#   DateTreatment,
+#   AffectedSide,
+#   PreoperativePlan:FemurFixation
+# )
+# 
+# GMKOutset <- SnapshotKA |> filter(
+#   !(TreatmentID %in% GMKSubset$TreatmentID)
+# ) |> dplyr::select(
+#   TreatmentID,
+#   DateTreatment,
+#   AffectedSide,
+#   PreoperativePlan:FemurFixation
+# )
 ```
 
-T
+
+
+```{r}
+
+BearingPlot <- GMKSubset |>
+  ggplot(aes(x = DateTreatment, y = CRTiming)) +
+  geom_point(alpha = 0.6, size = 2) +
+  labs(
+    title = "Cruciate retaining use over time",
+    x = "Date",
+    y = "Before or after first CR use"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+knitr::knit_print(BearingPlot)
+```
+
+
+```{r}
+
+CRcount <- GMKSubset |> summarise(
+  Countn = n(),
+  .by = CRTiming
+)
+
+
+```
+
+
+
+```{r}
+
+CRComp <- GMKSubset |> ggplot(
+  aes(y = KOOS12_DailyLiving_TotalScore_3months, x = CRTiming)) +
+  geom_dots() +
+  stat_halfeye(
+    alpha = 0.5,  # Transparency for overlap visibility
+    position = "identity",  # Overlay the distributions
+    na.rm = TRUE,
+    scale = 0.9  # Slightly scale down to avoid too much overlap
+  )
+
+knitr::knit_print(CRComp)
+```
+
+```{r}
+# Perform the Mann-Whitney U test
+CRTimingWilc <- wilcox.test(KOOS12_DailyLiving_TotalScore_3months ~ CRTiming, data = GMKSubset)
+
+
+knitr::knit_print(
+  CRTimingWilc
+)
+
+```
+
+```{r}
+
+MedDiff <- median(GMKSubset |> filter(CRTiming == "Pre") |> pull(KOOS12_DailyLiving_TotalScore_3months), na.rm = TRUE) - median(GMKSubset |> filter(CRTiming == "Post") |> pull(KOOS12_DailyLiving_TotalScore_3months), na.rm = TRUE) 
+
+```
+
+
+```{r}
+
+# Calculate proportions
+KneelPlotData <- GMKSubset |>filter(
+    !is.na(Kneeling_3months)
+  ) |> mutate(
+    Kneeling_3months = forcats::fct(
+      Kneeling_3months,
+      levels = c("Extreme", "Severe","Moderate","Mild","None"))
+  ) |>  count(CRTiming, Kneeling_3months) |>
+  group_by(CRTiming) |>
+  mutate(
+    proportion = n / sum(n),
+    percentage = round(proportion * 100, 1)
+  ) |>
+  ungroup() 
+
+# Create stacked barplot
+ggplot(KneelPlotData, aes(x = CRTiming, y = proportion, fill = Kneeling_3months)) +
+  geom_col(position = "fill") +
+  geom_text(
+    aes(label = paste0(percentage, "%")),
+    position = position_fill(vjust = 0.5),
+    color = "white",
+    size = 3.5
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    x = "CRTiming",
+    y = "Proportion",
+    fill = "Kneeling difficulty at 3month followup"
+  ) +
+  theme_minimal()
+
+
+```
+
+```{r}
+# Calculate proportions
+ADLPlotData <- GMKSubset |> dplyr::select(
+  TreatmentID,
+  CRTiming,
+  contains("DailyLiving") & contains("3months")
+  ) |> mutate(
+    across(
+      c(KOOS12DailyLivingQ1_3months,KOOS12DailyLivingQ3_3months,KOOS12DailyLivingQ4_3months),
+      ~forcats::fct(
+        .,
+        levels = c("Extreme", "Severe", "Moderate", "Mild", "None")
+    )
+  )
+  ) 
+
+ADLPlotData1 <- ADLPlotData |>  count(CRTiming, KOOS12DailyLivingQ1_3months) |> filter(
+    !is.na(KOOS12DailyLivingQ1_3months)
+  ) |> group_by(CRTiming) |>
+  mutate(
+    proportion = n / sum(n),
+    percentage = round(proportion * 100, 1)
+  ) |>
+  ungroup()
+
+ADLPlotData2 <- ADLPlotData |>  count(CRTiming, KOOS12DailyLivingQ3_3months) |> filter(
+    !is.na(KOOS12DailyLivingQ3_3months)
+  ) |> group_by(CRTiming) |>
+  mutate(
+    proportion = n / sum(n),
+    percentage = round(proportion * 100, 1)
+  ) |>
+  ungroup()
+
+ADLPlotData3 <- ADLPlotData |>  count(CRTiming, KOOS12DailyLivingQ4_3months) |> filter(
+    !is.na(KOOS12DailyLivingQ4_3months)
+  ) |> group_by(CRTiming) |>
+  mutate(
+    proportion = n / sum(n),
+    percentage = round(proportion * 100, 1)
+  ) |>
+  ungroup()
+
+
+# Create stacked barplot
+ADLPlot1 <- ggplot(ADLPlotData1, aes(x = CRTiming, y = proportion, fill = KOOS12DailyLivingQ1_3months)) +
+  geom_col(position = "fill") +
+  geom_text(
+    aes(label = paste0(percentage, "%")),
+    position = position_fill(vjust = 0.5),
+    color = "white",
+    size = 3.5
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    x = "CRTiming",
+    y = "Proportion",
+    fill = "Sit-stand difficulty at 3month followup"
+  ) +
+  theme_minimal()
+
+# Create stacked barplot
+ADLPlot2 <- ggplot(ADLPlotData2, aes(x = CRTiming, y = proportion, fill = KOOS12DailyLivingQ3_3months)) +
+  geom_col(position = "fill") +
+  geom_text(
+    aes(label = paste0(percentage, "%")),
+    position = position_fill(vjust = 0.5),
+    color = "white",
+    size = 3.5
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    x = "CRTiming",
+    y = "Proportion",
+    fill = "Vehicle egress difficulty at 3month followup"
+  ) +
+  theme_minimal()
+
+# Create stacked barplot
+ADLPlot3 <- ggplot(ADLPlotData3, aes(x = CRTiming, y = proportion, fill = KOOS12DailyLivingQ4_3months)) +
+  geom_col(position = "fill") +
+  geom_text(
+    aes(label = paste0(percentage, "%")),
+    position = position_fill(vjust = 0.5),
+    color = "white",
+    size = 3.5
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    x = "CRTiming",
+    y = "Proportion",
+    fill = "Twisting difficulty at 3month followup"
+  ) +
+  theme_minimal()
+
+ADLPlot1
+ADLPlot2
+ADLPlot3
+
+```
+
+
+
+```{r}
+
+# GMKSubset1 <- GMKSubset |> mutate(
+#   KneelOutcome = relevel(factor(Kneeling_3months), ref = "None")
+# )
+
+# Fit multinomial logistic regression
+# Adjusting for age and sex
+# The first level of categorical_outcome will be the reference category
+MultiNommodel <- multinom(
+  formula = Kneeling_3months ~ CRTiming + AgeAtTreatment + Sex,
+  data = GMKSubset
+)
+
+```
+
+```{r}
+
+# Extract tidy results with odds ratios and confidence intervals
+KneelResults <- MultiNommodel |>
+  tidy(conf.int = TRUE, exponentiate = TRUE) |>
+  filter(str_detect(term, "CRTiming")) |>
+  mutate(
+    across(c(estimate, conf.low, conf.high), ~round(., 2)),
+    p.value = round(p.value, 4)
+  ) |>
+  select(
+    outcome = y.level,
+    term,
+    odds_ratio = estimate,
+    ci_lower = conf.low,
+    ci_upper = conf.high,
+    p.value
+  )
+
+
+# Optional: Create a forest plot of the odds ratios
+ggplot(KneelResults, aes(x = odds_ratio, y = outcome)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
+  geom_point(size = 3) +
+  geom_errorbar(
+    aes(xmin = ci_lower, xmax = ci_upper),
+    height = 0.2,
+    #orientation = "x"
+  ) +
+  labs(
+    x = "Odds Ratio (95% CI)",
+    y = "Outcome Level",
+    title = "Adjusted Odds Ratios by Group"
+  ) +
+  theme_minimal()
+
+```
+
+## Subvastus outcomes
+
+```{r}
+
+SubvastusSubset <- STROBEFlow3 |> filter(
+  !is.na(followup) & arm3 == "KneeArthritis",
+  TreatmentType == "Primary",
+  Surgeon == "SM"
+) |> dplyr::select(
+  trialno
+) |> rename(
+  TreatmentID = "trialno"
+) |> left_join(
+  Snapshot |> dplyr::select(
+    TreatmentID,
+    AgeAtTreatment,
+    Sex,
+    AffectedSide,
+    DateTreatment,
+     starts_with("KOOS") & contains("TotalScore"),
+    Kneeling_3months,
+  ),
+  by = "TreatmentID"
+) |> left_join(
+  KneeIntraop |> dplyr::select(
+    `Treatment ID`,
+    Procedure:`Bearing Type`
+  ),
+  join_by(TreatmentID == `Treatment ID`)
+) |> filter(
+  is.na(Approach) | Approach == "Subvastus"
+) 
+
+```
+
+```{r}
+SubvKOOSTotal <- SubvastusSubset |> reframe(
+  qs = quantile(KOOS12_Summary_TotalScore_3months, c(0.25,0.5,0.75), na.rm = TRUE),
+)
+
+SubvastCount <- SubvastusSubset |> summarise(
+  Countn = n()
+) 
+
+SubvastCount2 <- SubvastusSubset |> filter(!is.na(KOOS12_Summary_TotalScore_3months)) |>
+  summarise(
+    Countn = n()
+  )
+
+
+```
+
+```{r}
+
+SubvastusComp <- ComplicTable |> rename_with(
+  ~str_replace_all(., " ", "")
+  ) |> filter(
+  TreatmentID %in% SubvastusSubset$TreatmentID,
+  ComplicationOccurrence == "Yes - Surgeon Confirmed"
+) |> left_join(
+  SubvastusSubset |> dplyr::select(
+    TreatmentID,
+    DateTreatment
+  ),
+  by = "TreatmentID"
+) |> dplyr::mutate(
+  OccurDelay =  as.numeric(as.duration(interval(ymd(DateTreatment), ymd(DateofOccurrence))),"days"),
+) |> filter(
+  between(OccurDelay,0,151)
+) |> group_by(
+  TreatmentID
+) |> slice_min(DateofOccurrence) |> ungroup() |> mutate(
+  Infection = if_else(
+    str_detect(str_to_lower(ComplicationNature),"infect|cellulitis|inflammatory|washout|abscess"),
+    "Yes",
+    "No"
+  ),
+  Fracture = if_else(
+    str_detect(str_to_lower(ComplicationNature),"fracture"),
+    "Yes",
+    "No"
+),
+Pain = if_else(
+    str_detect(str_to_lower(ComplicationNature),"pain"),
+    "Yes",
+    "No"
+),
+Stiffness = if_else(
+    str_detect(str_to_lower(ComplicationNature),"stiff|range|flexion"),
+    "Yes",
+    "No"
+)
+)
+
+```
+
+```{r}
+# Complication summary
+
+SubvastusSubset1 <- SubvastusSubset |> left_join(
+  SubvastusComp |> dplyr::select(
+    TreatmentID,
+    ReoperationProcedure,
+    OccurDelay:Stiffness
+  ),
+  by = "TreatmentID"
+)
+
+```
+
+
+```{r}
+
+levelskneel <- SubvastusSubset1 |> distinct(Kneeling_3months)
+
+SVPlotData <- SubvastusSubset1 |> filter(
+  !is.na(Kneeling_3months)
+) |> mutate(
+  Kneeling_3months = str_trim(Kneeling_3months),
+  Kneeling_3months = forcats::fct(
+    Kneeling_3months,
+    levels = c("Extreme","Severe","Moderate","Mild","None")
+  )
+) |>  count(Kneeling_3months) |> mutate(
+  proportion = n / sum(n),
+  percentage = round(proportion * 100, 1)
+) 
+
+```
+
+
+
+
+
