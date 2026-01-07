@@ -2594,6 +2594,174 @@ SVPlotData <- SubvastusSubset1 |> filter(
 ```
 
 
+## Preparation for upgrade
+
+Deidentification for initial testing
+
+Patient and complications table has already been read in
 
 
+```{r}
+#| label: read-tables2
+
+
+# Authenticate for sheets using the same token
+gs4_auth(token = drive_token())
+
+
+#To match to acctData
+TreatTable <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Treatment",
+  range = "A7:BM",
+  col_names = FALSE,
+  col_types = "DccccicccccccccDDDDtccDccDnncDcccccicccccccccccccccccccDcccccccDD"
+  )
+
+Treat_Col <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Treatment", 
+  range = "A1:BM1"
+)
+
+colnames(TreatTable) <- colnames(Treat_Col)
+
+```
+
+
+
+Deidentify patient data
+
+```{r}
+
+library(tidyverse)
+library(digest)
+library(lubridate)
+
+# Generate Australian mobile number format from hash
+generate_au_mobile <- function(hash_value) {
+  # Extract numeric portion from hash
+  numeric_hash <- as.numeric(paste0("0x", substr(hash_value, 1, 8)))
+  
+  # Generate 8-digit number and format as 04XX XXX XXX
+  mobile_number <- (numeric_hash %% 100000000) |> 
+    str_pad(width = 8, pad = "0")
+  
+  formatted <- paste0("04", substr(mobile_number, 1, 2), " ", 
+                     substr(mobile_number, 3, 5), " ", 
+                     substr(mobile_number, 6, 8))
+  
+  return(formatted)
+}
+
+# Generate scrambled date from hash (maintains date format)
+generate_scrambled_date <- function(original_date, hash_value) {
+  # Extract numeric portion from hash
+  numeric_hash <- as.numeric(paste0("0x", substr(hash_value, 1, 8)))
+  
+  # Generate a date offset (within reasonable range: +/- 20 years)
+  days_offset <- (numeric_hash %% 14600) - 7300
+  
+  # Apply offset to original date
+  scrambled_date <- original_date + days(days_offset)
+  
+  return(scrambled_date)
+}
+
+# Scramble identifiers in a single dataframe using hash-based approach
+scramble_identifiers <- function(df, id_columns, salt = "my_salt_123") {
+  
+  result <- df
+  
+  for (col in id_columns) {
+    if (col %in% names(df)) {
+      
+      # Get unique values for this column
+      unique_values <- df |>
+        pull(!!col) |>
+        unique() |>
+        na.omit()
+      
+      # Store original class for type conversion later
+      original_class <- class(df[[col]])[1]
+      
+      # Convert to character for hashing
+      unique_values_char <- as.character(unique_values)
+      
+      # Generate hash-based scrambled values
+      hashed_values <- map_chr(
+        unique_values_char, 
+        ~ digest::digest(paste0(.x, salt, col), algo = "md5")
+      )
+      
+      # Format based on column type
+      if (col == "Phone") {
+        # Format phone numbers as Australian mobiles
+        scrambled_values <- map_chr(hashed_values, generate_au_mobile)
+      } else if (col == "DateOfBirth" && original_class == "Date") {
+        # Generate scrambled dates that maintain Date format
+        scrambled_values <- map2_dbl(unique_values, hashed_values, 
+                                      ~as.numeric(generate_scrambled_date(.x, .y)))
+        scrambled_values <- as.Date(scrambled_values, origin = "1970-01-01")
+      } else {
+        # Keep as hash for other columns
+        scrambled_values <- hashed_values
+      }
+      
+      # Create lookup table for this column
+      lookup <- tibble(
+        original = unique_values,
+        scrambled = scrambled_values
+      ) |>
+        rename(!!col := original, !!paste0(col, "_new") := scrambled)
+      
+      # Join and replace
+      result <- result |>
+        left_join(lookup, by = col) |>
+        mutate(!!col := coalesce(!!sym(paste0(col, "_new")), !!sym(col))) |>
+        select(-!!paste0(col, "_new"))
+    }
+  }
+  
+  return(result)
+}
+```
+
+```{r}
+
+PatientDeid <- scramble_identifiers(
+  df = PatientTable,
+  id_columns = c("FirstName", "LastName", "DateOfBirth", "Email", "Phone"),
+  salt = "my_secret_salt"
+)
+
+```
+
+Merge tables
+
+```{r}
+
+PatientTable2 <- PatientTable |> dplyr::select(
+  -(c(
+    FirstName,
+    LastName,
+    DateOfBirth,
+    Email,
+    Phone
+  )
+)
+)
+
+PatientTableNew <- bind_cols(
+  PatientTable2,
+  PatientDeid |> dplyr::select(
+    FirstName,
+    LastName,
+    DateOfBirth,
+    Email,
+    Phone
+  )
+)
+
+```
 
