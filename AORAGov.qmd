@@ -2765,3 +2765,14 @@ PatientTableNew <- bind_cols(
 
 ```
 
+Write to CSV
+
+```{r}
+
+readr::write_csv(
+  PatientDeid,
+  "AORAPatient.csv"
+)
+
+```
+
