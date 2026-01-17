@@ -2203,8 +2203,6 @@ CRTiming = forcats::fct(
 # )
 ```
 
-
-
 ```{r}
 
 BearingPlot <- GMKSubset |>
@@ -2223,7 +2221,6 @@ BearingPlot <- GMKSubset |>
 knitr::knit_print(BearingPlot)
 ```
 
-
 ```{r}
 
 CRcount <- GMKSubset |> summarise(
@@ -2233,8 +2230,6 @@ CRcount <- GMKSubset |> summarise(
 
 
 ```
-
-
 
 ```{r}
 
@@ -2267,7 +2262,6 @@ knitr::knit_print(
 MedDiff <- median(GMKSubset |> filter(CRTiming == "Pre") |> pull(KOOS12_DailyLiving_TotalScore_3months), na.rm = TRUE) - median(GMKSubset |> filter(CRTiming == "Post") |> pull(KOOS12_DailyLiving_TotalScore_3months), na.rm = TRUE) 
 
 ```
-
 
 ```{r}
 
@@ -2406,8 +2400,6 @@ ADLPlot2
 ADLPlot3
 
 ```
-
-
 
 ```{r}
 
@@ -2573,7 +2565,6 @@ SubvastusSubset1 <- SubvastusSubset |> left_join(
 
 ```
 
-
 ```{r}
 
 levelskneel <- SubvastusSubset1 |> distinct(Kneeling_3months)
@@ -2593,13 +2584,11 @@ SVPlotData <- SubvastusSubset1 |> filter(
 
 ```
 
-
 ## Preparation for upgrade
 
 Deidentification for initial testing
 
 Patient and complications table has already been read in
-
 
 ```{r}
 #| label: read-tables2
@@ -2628,7 +2617,20 @@ colnames(TreatTable) <- colnames(Treat_Col)
 
 ```
 
+```{r}
 
+# Extract DarrenLog to retrieve lastcontact date
+# 
+DarrenTable <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Darren Log",
+  range = "A1:H",
+  col_names = TRUE,
+  col_types = "Dccccccc"
+  )
+
+
+```
 
 Deidentify patient data
 
@@ -2735,6 +2737,20 @@ PatientDeid <- scramble_identifiers(
   salt = "my_secret_salt"
 )
 
+TreatDeid <- scramble_identifiers(
+  df = TreatTable,
+  id_columns = c("FirstName", "LastName"),
+  salt = "my_secret_salt"
+)
+```
+
+Retrieve lastcontact
+
+```{r}
+
+DarrenTable2 <- DarrenTable |> group_by(`Treatment UID`) |> slice_max(`Time Stamp`)
+
+
 ```
 
 Merge tables
@@ -2752,6 +2768,14 @@ PatientTable2 <- PatientTable |> dplyr::select(
 )
 )
 
+TreatTable2 <- TreatTable |> dplyr::select(
+  -(c(
+    FirstName,
+    LastName
+  )
+)
+)
+
 PatientTableNew <- bind_cols(
   PatientTable2,
   PatientDeid |> dplyr::select(
@@ -2763,6 +2787,85 @@ PatientTableNew <- bind_cols(
   )
 )
 
+
+TreatTableNew <- bind_cols(
+  TreatTable2,
+  TreatDeid |> dplyr::select(
+    FirstName,
+    LastName
+  )
+) |> mutate(
+  Name = stringr::str_c(FirstName,", ", LastName),
+  RegistryCohortName2 = case_when(
+    stringr::str_detect(RegistryCohortName,"Knee") & stringr::str_detect(SurgicalTreatment,"Non") ~ "KneeArthritisNS",
+    stringr::str_detect(RegistryCohortName,"Hip") & stringr::str_detect(SurgicalTreatment,"Non") ~ "HipArthritisNS",
+    stringr::str_detect(RegistryCohortName,"Knee") & SurgicalTreatment == "Surgical" ~ "KneeArthritisSurg - AORA",
+    stringr::str_detect(RegistryCohortName,"Hip") & SurgicalTreatment == "Surgical" ~ "HipArthritisSurg - AORA",
+    .default = NA_character_
+    
+  ),
+  SurgeryRecommended = case_when(
+   stringr::str_detect(RegistryCohortName2,"NS") & stringr::str_detect(EBMAComment,"recommended") ~ "Yes",
+   stringr::str_detect(RegistryCohortName2,"NS") & (stringr::str_detect(EBMAComment,"recommended", negate = TRUE) | is.na(EBMAComment)) ~ "No",
+   SurgicalTreatment ==  "Surgical" ~ "NA",
+   .default = NA_character_
+  ),
+  # PatientID = stringr::str_split_i(TreatmentID,".",1),
+  Region = case_when(
+    stringr::str_detect(RegistryCohortName2,"Knee") ~ "Knee",
+    stringr::str_detect(RegistryCohortName2,"Hip") ~ "Hip",
+    .default = NA_character_
+  ),
+  Pre_InitialConsult = NA_character_,
+  Post_9months = NA_character_,
+  Post_60months = NA_character_,
+  Post_120months = NA_character_,
+  Provider = case_when(
+    Provider == "MG" ~ "MGenonOrtho",
+    Provider == "SM" ~ "SMartinOrtho",
+    .default = Provider
+  ),
+  Surgeon = case_when(
+    Surgeon == "MG" ~ "MGenonOrtho",
+    Surgeon == "SM" ~ "SMartinOrtho",
+    .default = Surgeon
+  ),
+  DiagnosisRawFinal = stringr::str_split_i(DiagnosisPrimary, " - ",2),
+  DiagnosisICD10Final = stringr::str_split_i(DiagnosisPrimary, " - ",1),
+  LookerComplicationVars = NA_character_
+  ) |> relocate(
+  RegistryCohortName, .before = RegistryCohortName2
+) |> left_join(
+  PatientTableNew |> dplyr::select(PatientID,PostCode),
+  by = "PatientID"
+) |> left_join(
+  DarrenTable2 |> dplyr::select(`Treatment UID`,`Time Stamp`),
+  join_by(TreatmentID == `Treatment UID`)
+) |> unite(
+  "EBMAComment2",
+  c(EBMAComment,StaffComment),
+  na.rm = TRUE,
+  remove = TRUE,
+  sep = ";"
+) |> dplyr::select(
+  -(c(
+    RegistryCohortName,
+    DateLatestContact
+    )
+    )
+  ) |> rename(
+  PROMsTrigger = "PROMs Trigger",
+  Postcode = "PostCode",
+  TimeNextAppointment = "NextAppointmentTime",
+  ProcedureForm = "Procedure",
+  ComplicationForm = "ComplicationStatus",
+  RegistryCohortName = "RegistryCohortName2",
+  DateLatestContact = "Time Stamp",
+  EBMAComment = "EBMAComment2"
+) 
+
+
+
 ```
 
 Write to CSV
@@ -2770,9 +2873,16 @@ Write to CSV
 ```{r}
 
 readr::write_csv(
-  PatientDeid,
+  PatientTableNew,
   "AORAPatient.csv"
 )
 
-```
+readr::write_csv(
+  TreatTableNew |> dplyr::select(
+DateTreatmentRecordCreation,PatientID,TreatmentActivity,TreatmentActivityNotes,PROMsTrigger,FollowupContactAttempt,DateLatestContact,TreatmentID,LastName,FirstName,Postcode,Surgeon,Provider,AnalysisLabel,ExternalStudyTag,ExternalStudyStatus,DateExternalStudyStatus,DateInitialExamination,DateTreatment,DateNextAppointment,TimeNextAppointment,TreatmentStatus,TreatmentStatusNotes,DateStatusChange,TreatmentType,AffectedSide,DateLastChecked,SurgeryRecommended,EBMAComment,ProcedureName,Facility,RegistryCohortName,RegistryCohortID,Region,ProcedureForm,ComplicationForm,CurrentTimepoint,Pre_InitialConsult,Pre_Treatment,Post_6weeks,Post_3months,Post_6months,Post_9months,Post_12months,Post_24months,Post_60months,Post_120months,CurrentFormID,CurrentPROMLink,CurrentPROMStatus,DateCurrentEndTimeWindow,ConsultListPROMS,ConsultListAppointmentType,DiagnosisRawPrelim,DiagnosisSNOMEDPrelim,DiagnosisRawFinal,DiagnosisSNOMEDFinal,DiagnosisICD10Final,DiagnosisICD10Prelim, LookerComplicationVars
+  ),
+  "AORATreat.csv",
+na = ""
+)
 
+```
