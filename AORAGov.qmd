@@ -2868,6 +2868,13 @@ TreatTableNew <- bind_cols(
 
 ```
 
+Do some checks
+
+```{r}
+# Identify rows in df_a that are not in df_b (based on the 'id' column)
+rows_not_in_b <- anti_join(TreatTableNew, TreatTable2, by = "TreatmentID")
+```
+
 Write to CSV
 
 ```{r}
