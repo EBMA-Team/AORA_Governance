@@ -2832,8 +2832,12 @@ TreatTableNew <- bind_cols(
   ),
   DiagnosisRawFinal = stringr::str_split_i(DiagnosisPrimary, " - ",2),
   DiagnosisICD10Final = stringr::str_split_i(DiagnosisPrimary, " - ",1),
-  LookerComplicationVars = NA_character_
-  ) |> relocate(
+  LookerComplicationVars = NA_character_,
+  dplyr::across(
+    dplyr::contains("Date") & !dplyr::all_of("DateCurrentEndTimeWindow"),
+    ~as.character(.x)
+        )
+      ) |> relocate(
   RegistryCohortName, .before = RegistryCohortName2
 ) |> left_join(
   PatientTableNew |> dplyr::select(PatientID,PostCode),
