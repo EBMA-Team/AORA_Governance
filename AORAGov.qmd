@@ -2584,7 +2584,7 @@ SVPlotData <- SubvastusSubset1 |> filter(
 
 ```
 
-## Preparation for upgrade
+# Preparation for upgrade
 
 Deidentification for initial testing
 
@@ -2797,11 +2797,11 @@ TreatTableNew <- bind_cols(
 ) |> mutate(
   Name = stringr::str_c(FirstName,", ", LastName),
   RegistryCohortName2 = case_when(
-    stringr::str_detect(RegistryCohortName,"Knee") & stringr::str_detect(SurgicalTreatment,"Non") ~ "KneeArthritisNS",
-    stringr::str_detect(RegistryCohortName,"Hip") & stringr::str_detect(SurgicalTreatment,"Non") ~ "HipArthritisNS",
+    stringr::str_detect(RegistryCohortName,"Knee") & (stringr::str_detect(SurgicalTreatment,"Non") | is.na(SurgicalTreatment)) ~ "KneeArthritisNS",
+    stringr::str_detect(RegistryCohortName,"Hip") & (stringr::str_detect(SurgicalTreatment,"Non") | is.na(SurgicalTreatment)) ~ "HipArthritisNS",
     stringr::str_detect(RegistryCohortName,"Knee") & SurgicalTreatment == "Surgical" ~ "KneeArthritisSurg - AORA",
     stringr::str_detect(RegistryCohortName,"Hip") & SurgicalTreatment == "Surgical" ~ "HipArthritisSurg - AORA",
-    .default = NA_character_
+    .default = "LLGenLongNS"
     
   ),
   SurgeryRecommended = case_when(
