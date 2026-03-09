@@ -148,7 +148,8 @@ Data was retrieved from live database tables. Source files were specified and st
 #| echo: false
 
 SheetIDs <- list(
-DbSS = "https://docs.google.com/spreadsheets/d/1fhW1LJbsdvkA7u-z1IGgI2qHwiOWXP6RMRH8-cgPXU8/edit"
+DbSS = "https://docs.google.com/spreadsheets/d/1fhW1LJbsdvkA7u-z1IGgI2qHwiOWXP6RMRH8-cgPXU8/edit",
+IntHistory = "https://docs.google.com/spreadsheets/d/1YBYcxJtRIoH0rD87bWCBvIFiKQp-b-JmklWPOh_-wDY/edit"
 )
 
 # Treatments Masterlist - Timestamp is > Registry Start date (gsuite)
@@ -163,74 +164,164 @@ gs4_auth(token = drive_token())
 
 
 
-ComplicTable <- googlesheets4::read_sheet(
-  ss = SheetIDs$DbSS,
-  sheet = "Complications", 
-  col_names = TRUE, 
-  col_types = "TccDccDc"
+# ComplicTable <- googlesheets4::read_sheet(
+#   ss = SheetIDs$DbSS,
+#   sheet = "Complications", 
+#   col_names = TRUE, 
+#   col_types = "TccDccDc"
+#   )
+# 
+# 
+# #To match to acctData
+# PatientTable <- googlesheets4::range_read(
+#   ss = SheetIDs$DbSS,
+#   sheet = "Patient", 
+#   range = "A7:P",
+#   col_names = FALSE, 
+#   col_types = "DccccDcccDciccci"
+#   )
+# 
+# 
+# Patient_Col <- c(
+#   "PatientCreationDate",
+#   "PatientID",
+#   "LastName",	
+#   "FirstName",	
+#   "AlternateID",	
+#   "DateOfBirth",	
+#   "Sex",	
+#   "RegistryStatus",	
+#   "RegistryStatusNotes",	
+#   "DateRegistryStatus",	
+#   "NotificationMethod",	
+#   "NoTreatmentRecords",	
+#   "Email",	
+#   "Phone",
+#   "PostCode",
+#   "TrueNoTreatments"
+# )
+# 
+# colnames(PatientTable) <- Patient_Col
+# 
+# 
+# MonitorPlan <- googlesheets4::range_read(
+#   ss = SheetIDs$DbSS,
+#   sheet = "Monitor Module", 
+#   range = "A1:O",
+#   col_names = TRUE, 
+#   col_types = "ccccDTtincTccii"
+#   )
+# 
+# 
+# MonitorLog <- googlesheets4::range_read(
+#   ss = SheetIDs$DbSS,
+#   sheet = "MonitorModuleLog", 
+#   range = "A1:K",
+#   col_names = TRUE, 
+#   col_types = "Tcicccccccc"
+#   )
+# 
+# MonitorResponse <- googlesheets4::range_read(
+#   ss = SheetIDs$DbSS,
+#   sheet = "Monitoring", 
+#   range = "A1:Q",
+#   col_names = TRUE, 
+#   col_types = "TccccccccccnccDic"
+#   )
+
+IntHistory <- googlesheets4::range_read(
+  ss = SheetIDs$IntHistory,
+  sheet = "AORA - Medical History_RawData", 
+  range = "A4:CO",
+  col_names = FALSE
   )
 
-
-#To match to acctData
-PatientTable <- googlesheets4::range_read(
-  ss = SheetIDs$DbSS,
-  sheet = "Patient", 
-  range = "A7:P",
-  col_names = FALSE, 
-  col_types = "DccccDcccDciccci"
+IntHistoryCol <- googlesheets4::range_read(
+  ss = SheetIDs$IntHistory,
+  sheet = "AORA - Medical History_RawData", 
+  range = "A3:CO3",
+  col_names = FALSE
   )
 
-
-Patient_Col <- c(
-  "PatientCreationDate",
-  "PatientID",
-  "LastName",	
-  "FirstName",	
-  "AlternateID",	
-  "DateOfBirth",	
-  "Sex",	
-  "RegistryStatus",	
-  "RegistryStatusNotes",	
-  "DateRegistryStatus",	
-  "NotificationMethod",	
-  "NoTreatmentRecords",	
-  "Email",	
-  "Phone",
-  "PostCode",
-  "TrueNoTreatments"
-)
-
-colnames(PatientTable) <- Patient_Col
-
-
-MonitorPlan <- googlesheets4::range_read(
-  ss = SheetIDs$DbSS,
-  sheet = "Monitor Module", 
-  range = "A1:O",
-  col_names = TRUE, 
-  col_types = "ccccDTtincTccii"
-  )
-
-
-MonitorLog <- googlesheets4::range_read(
-  ss = SheetIDs$DbSS,
-  sheet = "MonitorModuleLog", 
-  range = "A1:K",
-  col_names = TRUE, 
-  col_types = "Tcicccccccc"
-  )
-
-MonitorResponse <- googlesheets4::range_read(
-  ss = SheetIDs$DbSS,
-  sheet = "Monitoring", 
-  range = "A1:Q",
-  col_names = TRUE, 
-  col_types = "TccccccccccnccDic"
-  )
-
-
+ colnames(IntHistory) <- IntHistoryCol
 
 ```
+
+## Retrieve MMM
+
+```{r}
+
+# ── 1. Download the POA 2021 × MMM 2023 concordance ──────────────────────────
+# Direct xlsx from data.gov.au (Dept of Health and Aged Care, CC BY 2.5 AU)
+# https://www.data.gov.au/data/dataset/postal-areas-2021-by-modified-monash-model-2023
+
+# mmm_url <- "https://data.gov.au/data/dataset/9c4e8fab-e9c3-4728-80a8-e59643f258a5/resource/04ed31ba-d48b-437c-9279-f4b788b9dd90/download/poa_21-mmm_23.xlsx"
+# 
+# tmp <- tempfile(fileext = ".xlsx")
+# download.file(mmm_url, destfile = tmp, mode = "wb")
+# 
+# concordance_raw <- openxlsx2::wb_to_df(tmp, start_row = 8, start_col = 2, skip_empty_cols = TRUE)
+
+# ── 2. Inspect and clean the concordance ─────────────────────────────────────
+# Preview structure first — column names may vary; check with:
+# glimpse(concordance_raw)
+
+MMMPostcode <- concordance_raw |>
+  rename_with(str_to_lower) |>
+  rename(
+    postcode  = "poa 2021 code",
+    mmm_code  = "mmm 2023"
+  ) |>
+  summarise(
+    mmm_code       = max(mmm_code, na.rm = TRUE),
+    mmm_ambiguous  = n() > 1,
+    .by = postcode
+  )  |>
+  mutate(
+    postcode = as.character(postcode),
+    mmm_code = as.integer(mmm_code),
+    mmm_label = case_when(
+      mmm_code == 1 ~ "Metropolitan",
+      mmm_code == 2 ~ "Regional centre",
+      mmm_code == 3 ~ "Large rural town",
+      mmm_code == 4 ~ "Medium rural town",
+      mmm_code == 5 ~ "Small rural town",
+      mmm_code == 6 ~ "Remote community",
+      mmm_code == 7 ~ "Very remote community",
+      .default      = NA_character_
+    )
+  ) |>
+  select(postcode, mmm_code, mmm_label, mmm_ambiguous)
+
+```
+
+```{r}
+
+
+IntHistory1 <- IntHistory |> dplyr::select(
+  FormIDMedicalHistory,
+  EducationLevel,
+  SmokingStatus,
+  AlcoholConsumption,
+  ActivityDuration,
+  SymptomOnset,
+  SymptomDuration
+) |> rename(
+  FormID = "FormIDMedicalHistory"
+) |> distinct(
+  FormID,
+  .keep_all = TRUE
+  ) |> mutate(
+    TreatmentID = str_extract(FormID, "^\\d+\\.\\d+"),
+    SymptomDuration1 = if_else(
+      as.numeric(str_extract(SymptomDuration, "\\d+")) >1000,
+      NA,
+      as.numeric(str_extract(SymptomDuration, "\\d+"))
+  )) 
+
+```
+
+
 
 ```{r}
 
@@ -300,6 +391,11 @@ STROBEInput <- openxlsx2::wb_to_df(
   )
 
 ```
+
+
+
+
+
 
 # Context
 
@@ -2164,18 +2260,70 @@ Snapshot3 <- STROBEFlow3 |> filter(
     starts_with("KOOS") & contains("TotalScore"),
     Kneeling_3months,
     starts_with("KOOS") & contains("DailyLiving") & contains("3months"),
+    starts_with("MODEMQ"),
+    starts_with("Comorb"),
+    VR12_Physical_TotalScore_Preop,
+    VR12_Mental_TotalScore_Preop,
     AgeAtTreatment,
-    Sex
+    Sex,
+    Postcode,
+    Facility
   ),
   by = "TreatmentID"
+) |> mutate(
+  across(
+      ComorbHeartDisease_Preop:ComorbOtherMedicalCondition_Preop,
+      ~ case_when(
+        str_detect(.x, "not") ~ 0,
+        str_detect(.x, "not|activities|treatment", negate = TRUE) ~ 1,
+        str_detect(.x, "treatment") ~ 2,
+        str_detect(.x, "activities")~ 3
+      )
+    ),
+    SACQ_score = if_else(
+      rowSums(!is.na(pick(ComorbHeartDisease_Preop:ComorbOtherMedicalCondition_Preop))) == 0L,
+      NA_integer_,
+      rowSums(
+        pick(ComorbHeartDisease_Preop:ComorbOtherMedicalCondition_Preop),
+        na.rm = TRUE
+    )
+    ),
+  across(
+      MODEMQ1_Preop:MODEMQ6_Preop,
+      ~ case_when(
+        str_detect(.x, "Extremely") ~ 4,
+        str_detect(.x, "Very") ~ 3,
+        str_detect(.x, "Somewhat") ~ 2,
+        str_detect(.x, "Slightly") ~ 1,
+        str_detect(.x, "Not.likely") ~ 0,
+        str_detect(.x, "applicable") ~ NA,
+        is.na(.x) ~ NA
+      )
+    ),
+    MODEMExp = if_else(
+      rowSums(!is.na(pick(MODEMQ1_Preop:MODEMQ6_Preop))) == 0,
+      NA_integer_,
+      rowSums(
+        pick(MODEMQ1_Preop:MODEMQ6_Preop),
+        na.rm = TRUE
+    )
+    )
+) |> filter(
+  stringr::str_detect(RegistryStatus, "Opt", negate = TRUE),
+  stringr::str_detect(TreatmentStatus, "Pend", negate = TRUE)
 )
 
 BearingType <- distinct(Snapshot3, BearingType)
+
+```
+
+```{r}
 
 GMKSubset <- Snapshot3 |> filter(
   str_detect(str_to_lower(FemurBrand),"gmk|gmc|sph*|medacta"),
   str_detect(str_to_lower(BearingType),"medial")
 ) |> dplyr::mutate(
+  PatientID = stringr::str_split_i(TreatmentID,"\\.",1),
 CRTiming = case_when(
   DateTreatment <= ymd("2022-Nov-02") ~ "Pre",
   DateTreatment >= ymd("2022-Nov-02") ~ "Post"
@@ -2184,24 +2332,53 @@ CRTiming = forcats::fct(
   CRTiming,
   levels = c("Pre","Post")
 )
-)
-# 
-# |> dplyr::select(
-#   TreatmentID,
-#   DateTreatment,
-#   AffectedSide,
-#   PreoperativePlan:FemurFixation
-# )
-# 
-# GMKOutset <- SnapshotKA |> filter(
-#   !(TreatmentID %in% GMKSubset$TreatmentID)
-# ) |> dplyr::select(
-#   TreatmentID,
-#   DateTreatment,
-#   AffectedSide,
-#   PreoperativePlan:FemurFixation
-# )
+) |> left_join(
+  IntHistory1 |> dplyr::select(
+    TreatmentID,
+    EducationLevel:SymptomOnset,
+    SymptomDuration1
+  ),
+  by = "TreatmentID"
+) |> left_join(
+  MMMPostcode,
+  join_by(Postcode == postcode),
+  relationship = "many-to-one"
+) 
+
 ```
+
+
+```{r}
+#| label: tbl-crflex-demographics
+#| tbl-cap: "Summary of demographics comparing pre vs post flex introduction"
+
+Tableflexdemo <- gtsummary::tbl_summary(
+  GMKSubset |> dplyr::select(
+    CRTiming,
+    AgeAtTreatment,
+    Sex,
+    EducationLevel,
+    mmm_label,
+    SACQ_score,
+    MODEMExp,
+    KOOS12_Pain_TotalScore_Preop,
+    VR12_Physical_TotalScore_Preop,
+    VR12_Mental_TotalScore_Preop,
+    TreatmentStatus,
+    DateTreatment
+  ),
+  by = "CRTiming",
+  missing = "no",
+  statistic = list(
+    DateTreatment ~ "{min} - {max}"
+  )
+) |>
+  add_overall()
+
+knitr::knit_print(Tableflexdemo)
+```
+
+
 
 ```{r}
 
