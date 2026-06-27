@@ -2265,9 +2265,9 @@ Snapshot3 <- STROBEFlow3 |> filter(
     VR12_Physical_TotalScore_Preop,
     VR12_Mental_TotalScore_Preop,
     AgeAtTreatment,
-    Sex,
+    #Sex,
     Postcode,
-    Facility
+    #Facility
   ),
   by = "TreatmentID"
 ) |> mutate(
