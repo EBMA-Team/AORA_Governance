@@ -164,81 +164,81 @@ gs4_auth(token = drive_token())
 
 
 
-# ComplicTable <- googlesheets4::read_sheet(
-#   ss = SheetIDs$DbSS,
-#   sheet = "Complications", 
-#   col_names = TRUE, 
-#   col_types = "TccDccDc"
-#   )
-# 
-# 
+ComplicTable <- googlesheets4::read_sheet(
+  ss = SheetIDs$DbSS,
+  sheet = "Complications",
+  col_names = TRUE,
+  col_types = "TccDccDc"
+  )
+#
+#
 # #To match to acctData
-# PatientTable <- googlesheets4::range_read(
-#   ss = SheetIDs$DbSS,
-#   sheet = "Patient", 
-#   range = "A7:P",
-#   col_names = FALSE, 
-#   col_types = "DccccDcccDciccci"
-#   )
-# 
-# 
-# Patient_Col <- c(
-#   "PatientCreationDate",
-#   "PatientID",
-#   "LastName",	
-#   "FirstName",	
-#   "AlternateID",	
-#   "DateOfBirth",	
-#   "Sex",	
-#   "RegistryStatus",	
-#   "RegistryStatusNotes",	
-#   "DateRegistryStatus",	
-#   "NotificationMethod",	
-#   "NoTreatmentRecords",	
-#   "Email",	
-#   "Phone",
-#   "PostCode",
-#   "TrueNoTreatments"
-# )
-# 
-# colnames(PatientTable) <- Patient_Col
-# 
-# 
-# MonitorPlan <- googlesheets4::range_read(
-#   ss = SheetIDs$DbSS,
-#   sheet = "Monitor Module", 
-#   range = "A1:O",
-#   col_names = TRUE, 
-#   col_types = "ccccDTtincTccii"
-#   )
-# 
-# 
-# MonitorLog <- googlesheets4::range_read(
-#   ss = SheetIDs$DbSS,
-#   sheet = "MonitorModuleLog", 
-#   range = "A1:K",
-#   col_names = TRUE, 
-#   col_types = "Tcicccccccc"
-#   )
-# 
-# MonitorResponse <- googlesheets4::range_read(
-#   ss = SheetIDs$DbSS,
-#   sheet = "Monitoring", 
-#   range = "A1:Q",
-#   col_names = TRUE, 
-#   col_types = "TccccccccccnccDic"
-#   )
+PatientTable <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Patient",
+  range = "A7:P",
+  col_names = FALSE,
+  col_types = "DccccDcccDciccci"
+  )
+
+#
+Patient_Col <- c(
+  "PatientCreationDate",
+  "PatientID",
+  "LastName",
+  "FirstName",
+  "AlternateID",
+  "DateOfBirth",
+  "Sex",
+  "RegistryStatus",
+  "RegistryStatusNotes",
+  "DateRegistryStatus",
+  "NotificationMethod",
+  "NoTreatmentRecords",
+  "Email",
+  "Phone",
+  "PostCode",
+  "TrueNoTreatments"
+)
+#
+colnames(PatientTable) <- Patient_Col
+#
+#
+MonitorPlan <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Monitor Module",
+  range = "A1:O",
+  col_names = TRUE,
+  col_types = "ccccDTtincTccii"
+  )
+
+#
+MonitorLog <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "MonitorModuleLog",
+  range = "A1:K",
+  col_names = TRUE,
+  col_types = "Tcicccccccc"
+  )
+#
+MonitorResponse <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Monitoring",
+  range = "A1:Q",
+  col_names = TRUE,
+  col_types = "TccccccccccnccDic"
+  )
 
 IntHistory <- googlesheets4::range_read(
   ss = SheetIDs$IntHistory,
-  sheet = "AORA - Medical History_RawData", 
+  sheet = "AORA - Medical History_RawData",
   range = "A4:CO",
   col_names = FALSE
   )
 
 IntHistoryCol <- googlesheets4::range_read(
   ss = SheetIDs$IntHistory,
-  sheet = "AORA - Medical History_RawData", 
+  sheet = "AORA - Medical History_RawData",
   range = "A3:CO3",
   col_names = FALSE
   )
@@ -445,7 +445,7 @@ STROBEFlow2 <- STROBEInput |>
 
 ```{r}
 
-CurrentDate <- as.character("20250617")
+CurrentDate <- as.character("20260626")
 
 STROBEFlow3 <- STROBEFlow2 |> dplyr::mutate(
     exclusion1 = case_when(
@@ -2769,6 +2769,7 @@ Patient and complications table has already been read in
 
 ```{r}
 #| label: read-tables2
+#| execute: false
 
 
 # Authenticate for sheets using the same token
@@ -2795,6 +2796,8 @@ colnames(TreatTable) <- colnames(Treat_Col)
 ```
 
 ```{r}
+#| execute: false
+
 
 # Extract DarrenLog to retrieve lastcontact date
 # 
@@ -2812,6 +2815,8 @@ DarrenTable <- googlesheets4::range_read(
 Deidentify patient data
 
 ```{r}
+#| execute: false
+
 
 library(tidyverse)
 library(digest)
@@ -2907,23 +2912,27 @@ scramble_identifiers <- function(df, id_columns, salt = "my_salt_123") {
 ```
 
 ```{r}
+#| execute: false
 
-PatientDeid <- scramble_identifiers(
-  df = PatientTable,
-  id_columns = c("FirstName", "LastName", "DateOfBirth", "Email", "Phone"),
-  salt = "my_secret_salt"
-)
 
-TreatDeid <- scramble_identifiers(
-  df = TreatTable,
-  id_columns = c("FirstName", "LastName"),
-  salt = "my_secret_salt"
-)
+# PatientDeid <- scramble_identifiers(
+#   df = PatientTable,
+#   id_columns = c("FirstName", "LastName", "DateOfBirth", "Email", "Phone"),
+#   salt = "my_secret_salt"
+# )
+# 
+# TreatDeid <- scramble_identifiers(
+#   df = TreatTable,
+#   id_columns = c("FirstName", "LastName"),
+#   salt = "my_secret_salt"
+# )
 ```
 
 Retrieve lastcontact
 
 ```{r}
+#| execute: false
+
 
 DarrenTable2 <- DarrenTable |> group_by(`Treatment UID`) |> slice_max(`Time Stamp`)
 
@@ -2933,6 +2942,8 @@ DarrenTable2 <- DarrenTable |> group_by(`Treatment UID`) |> slice_max(`Time Stam
 Merge tables
 
 ```{r}
+#| execute: false
+
 
 PatientTable2 <- PatientTable |> dplyr::select(
   -(c(
@@ -3052,6 +3063,9 @@ TreatTableNew <- bind_cols(
 Do some checks
 
 ```{r}
+#| execute: false
+
+
 # Identify rows in df_a that are not in df_b (based on the 'id' column)
 rows_not_in_b <- anti_join(TreatTableNew, TreatTable2, by = "TreatmentID")
 ```
@@ -3059,6 +3073,7 @@ rows_not_in_b <- anti_join(TreatTableNew, TreatTable2, by = "TreatmentID")
 Write to CSV
 
 ```{r}
+#| execute: false
 
 readr::write_csv(
   PatientTableNew,
