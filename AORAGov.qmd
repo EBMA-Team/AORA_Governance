@@ -2587,7 +2587,7 @@ ADLPlot3
 # Fit multinomial logistic regression
 # Adjusting for age and sex
 # The first level of categorical_outcome will be the reference category
-MultiNommodel <- multinom(
+MultiNommodel <- nnet::multinom(
   formula = Kneeling_3months ~ CRTiming + AgeAtTreatment + Sex,
   data = GMKSubset
 )
@@ -2620,7 +2620,7 @@ ggplot(KneelResults, aes(x = odds_ratio, y = outcome)) +
   geom_point(size = 3) +
   geom_errorbar(
     aes(xmin = ci_lower, xmax = ci_upper),
-    height = 0.2,
+    width = 0.2,
     #orientation = "x"
   ) +
   labs(
