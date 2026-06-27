@@ -7,7 +7,7 @@ type: "website"
 number-sections: true
 number-depth: 3
 date: "2025-Nov-30"
-date-modified: "2025-Dec-01"
+date-modified: "2026-Jun-26"
 
 bibliography: AORAGov references.bib
 
@@ -255,12 +255,12 @@ IntHistoryCol <- googlesheets4::range_read(
 # Direct xlsx from data.gov.au (Dept of Health and Aged Care, CC BY 2.5 AU)
 # https://www.data.gov.au/data/dataset/postal-areas-2021-by-modified-monash-model-2023
 
-# mmm_url <- "https://data.gov.au/data/dataset/9c4e8fab-e9c3-4728-80a8-e59643f258a5/resource/04ed31ba-d48b-437c-9279-f4b788b9dd90/download/poa_21-mmm_23.xlsx"
-# 
-# tmp <- tempfile(fileext = ".xlsx")
-# download.file(mmm_url, destfile = tmp, mode = "wb")
-# 
-# concordance_raw <- openxlsx2::wb_to_df(tmp, start_row = 8, start_col = 2, skip_empty_cols = TRUE)
+mmm_url <- "https://data.gov.au/data/dataset/9c4e8fab-e9c3-4728-80a8-e59643f258a5/resource/04ed31ba-d48b-437c-9279-f4b788b9dd90/download/poa_21-mmm_23.xlsx"
+#
+tmp <- tempfile(fileext = ".xlsx")
+download.file(mmm_url, destfile = tmp, mode = "wb")
+
+concordance_raw <- openxlsx2::wb_to_df(tmp, start_row = 8, start_col = 2, skip_empty_cols = TRUE)
 
 # ── 2. Inspect and clean the concordance ─────────────────────────────────────
 # Preview structure first — column names may vary; check with:
