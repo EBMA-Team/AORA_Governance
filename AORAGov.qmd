@@ -164,86 +164,86 @@ gs4_auth(token = drive_token())
 
 
 
-# ComplicTable <- googlesheets4::read_sheet(
-#   ss = SheetIDs$DbSS,
-#   sheet = "Complications",
-#   col_names = TRUE,
-#   col_types = "TccDccDc"
-#   )
-# #
-# #
-# # #To match to acctData
-# PatientTable <- googlesheets4::range_read(
-#   ss = SheetIDs$DbSS,
-#   sheet = "Patient",
-#   range = "A7:P",
-#   col_names = FALSE,
-#   col_types = "DccccDcccDciccci"
-#   )
-# 
-# #
-# Patient_Col <- c(
-#   "PatientCreationDate",
-#   "PatientID",
-#   "LastName",
-#   "FirstName",
-#   "AlternateID",
-#   "DateOfBirth",
-#   "Sex",
-#   "RegistryStatus",
-#   "RegistryStatusNotes",
-#   "DateRegistryStatus",
-#   "NotificationMethod",
-#   "NoTreatmentRecords",
-#   "Email",
-#   "Phone",
-#   "PostCode",
-#   "TrueNoTreatments"
-# )
-# #
-# colnames(PatientTable) <- Patient_Col
-# #
-# #
-# MonitorPlan <- googlesheets4::range_read(
-#   ss = SheetIDs$DbSS,
-#   sheet = "Monitor Module",
-#   range = "A1:O",
-#   col_names = TRUE,
-#   col_types = "ccccDTtincTccii"
-#   )
-# 
-# #
-# MonitorLog <- googlesheets4::range_read(
-#   ss = SheetIDs$DbSS,
-#   sheet = "MonitorModuleLog",
-#   range = "A1:K",
-#   col_names = TRUE,
-#   col_types = "Tcicccccccc"
-#   )
-# #
-# MonitorResponse <- googlesheets4::range_read(
-#   ss = SheetIDs$DbSS,
-#   sheet = "Monitoring",
-#   range = "A1:Q",
-#   col_names = TRUE,
-#   col_types = "TccccccccccnccDic"
-#   )
-# 
-# IntHistory <- googlesheets4::range_read(
-#   ss = SheetIDs$IntHistory,
-#   sheet = "AORA - Medical History_RawData",
-#   range = "A4:CO",
-#   col_names = FALSE
-#   )
-# 
-# IntHistoryCol <- googlesheets4::range_read(
-#   ss = SheetIDs$IntHistory,
-#   sheet = "AORA - Medical History_RawData",
-#   range = "A3:CO3",
-#   col_names = FALSE
-#   )
-# 
-#  colnames(IntHistory) <- IntHistoryCol
+ComplicTable <- googlesheets4::read_sheet(
+  ss = SheetIDs$DbSS,
+  sheet = "Complications",
+  col_names = TRUE,
+  col_types = "TccDccDc"
+  )
+#
+#
+# #To match to acctData
+PatientTable <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Patient",
+  range = "A7:P",
+  col_names = FALSE,
+  col_types = "DccccDcccDciccci"
+  )
+
+#
+Patient_Col <- c(
+  "PatientCreationDate",
+  "PatientID",
+  "LastName",
+  "FirstName",
+  "AlternateID",
+  "DateOfBirth",
+  "Sex",
+  "RegistryStatus",
+  "RegistryStatusNotes",
+  "DateRegistryStatus",
+  "NotificationMethod",
+  "NoTreatmentRecords",
+  "Email",
+  "Phone",
+  "PostCode",
+  "TrueNoTreatments"
+)
+#
+colnames(PatientTable) <- Patient_Col
+#
+#
+MonitorPlan <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Monitor Module",
+  range = "A1:O",
+  col_names = TRUE,
+  col_types = "ccccDTtincTccii"
+  )
+
+#
+MonitorLog <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "MonitorModuleLog",
+  range = "A1:K",
+  col_names = TRUE,
+  col_types = "Tcicccccccc"
+  )
+#
+MonitorResponse <- googlesheets4::range_read(
+  ss = SheetIDs$DbSS,
+  sheet = "Monitoring",
+  range = "A1:Q",
+  col_names = TRUE,
+  col_types = "TccccccccccnccDic"
+  )
+
+IntHistory <- googlesheets4::range_read(
+  ss = SheetIDs$IntHistory,
+  sheet = "AORA - Medical History_RawData",
+  range = "A4:CO",
+  col_names = FALSE
+  )
+
+IntHistoryCol <- googlesheets4::range_read(
+  ss = SheetIDs$IntHistory,
+  sheet = "AORA - Medical History_RawData",
+  range = "A3:CO3",
+  col_names = FALSE
+  )
+
+ colnames(IntHistory) <- IntHistoryCol
 #  
  TreatTable <- googlesheets4::range_read(
   ss = SheetIDs$DbSS,
