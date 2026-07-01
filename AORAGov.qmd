@@ -1045,7 +1045,10 @@ knitr::knit_print(TableComp)
 
 ```
 
+```{epoxy}
 Adverse events were detected in 16% of surgical cases performed by SM over the life of the registry as shown in @tbl-comp, with an average detection with 14 days of surgery and 50% of cases detected within 60 days, with some instances for the Knee Arthritis occurring later than Hip Arthritis.
+```
+
 
 ## Knee Arthritis
 
